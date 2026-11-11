@@ -67,10 +67,11 @@ function EmailGate({ onContinue }: { onContinue: (email: string) => void }) {
         </CardHeader>
         <CardContent>
           <form
-            onSubmit={form.handleSubmit((values) => {
-              void values.email;
-              onContinue(values.email);
-            })}
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              void form.handleSubmit((values) => onContinue(values.email))(event);
+            }}
           >
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.email || undefined}>
