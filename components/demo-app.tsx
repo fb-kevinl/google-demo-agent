@@ -223,7 +223,7 @@ function DemoShell({
           {browserError ? (
             <EmptyState title="Live view failed" body={browserError} />
           ) : !browser ? (
-            <EmptyState title="Opening google.com" body="Starting a Browserbase session, or a sample view if the project id is missing." />
+            <EmptyState title="Opening google.com" body="Starting a Browserbase session, or a sample view if the API key is missing." />
           ) : browser.liveViewUrl ? (
             <iframe
               title="Google live view"
@@ -293,7 +293,7 @@ function DemoShell({
         </Card>
         {browser?.mocked && (
           <p className="px-1 text-xs text-muted-foreground">
-            Sample iframe is on because BROWSERBASE_PROJECT_ID is unset. Searches still return sample titles
+            Sample iframe is on because BROWSERBASE_API_KEY is unset. Searches still return sample titles
             {mockQuery ? ` (last: ${mockQuery})` : ""}.
           </p>
         )}

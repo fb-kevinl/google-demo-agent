@@ -19,10 +19,6 @@ function apiKey() {
   return process.env.BROWSERBASE_API_KEY?.trim() || "";
 }
 
-function projectId() {
-  return process.env.BROWSERBASE_PROJECT_ID?.trim() || "";
-}
-
 function client() {
   return new Browserbase({ apiKey: apiKey() });
 }
@@ -37,12 +33,12 @@ function mockSearch(query: string): SearchResult {
     ok: true,
     mocked: true,
     query: q,
-    narration: `Sample results for “${q}” (Browserbase project is not live): 1) Wikipedia-style overview. 2) Recent headlines. 3) Official site snippet. Narrate only these sample titles; this is not a real SERP.`,
+    narration: `Sample results for “${q}” (Browserbase key is not set): 1) Wikipedia-style overview. 2) Recent headlines. 3) Official site snippet. Narrate only these sample titles; this is not a real SERP.`,
   };
 }
 
 export function isBrowserConfigured() {
-  return Boolean(apiKey() && projectId());
+  return Boolean(apiKey());
 }
 
 export async function releaseSession(sessionId: string) {
@@ -61,12 +57,11 @@ export async function startLiveSession(previousId?: string | null): Promise<Live
       sessionId: `mock-${Date.now()}`,
       liveViewUrl: null,
       mocked: true,
-      message: "Sample live view. Set BROWSERBASE_PROJECT_ID to drive google.com.",
+      message: "Sample live view. Set BROWSERBASE_API_KEY to drive google.com.",
     };
   }
 
   const session = await client().sessions.create({
-    projectId: projectId(),
     keepAlive: true,
     api_timeout: 600,
     browserSettings: {

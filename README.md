@@ -10,7 +10,7 @@ UI is `@fastbreak-amateur/fb-toolkit` 5.17.0 (GitHub Packages). Set `GITHUB_TOKE
 export GITHUB_TOKEN=ghp_...   # read:packages for @fastbreak-amateur/fb-toolkit
 pnpm install
 cp .env.example .env.local
-# fill ELEVENLABS_API_KEY, BROWSERBASE_API_KEY, ELEVENLABS_AGENT_ID, BROWSERBASE_PROJECT_ID
+# fill ELEVENLABS_API_KEY, BROWSERBASE_API_KEY, ELEVENLABS_AGENT_ID
 pnpm dev
 ```
 
@@ -33,16 +33,15 @@ Set `ELEVENLABS_AGENT_ID` to that agent. Restricted API key: ElevenAgents Read+W
 | Name | Role |
 | --- | --- |
 | `ELEVENLABS_API_KEY` | Secret. Conversation token. |
-| `BROWSERBASE_API_KEY` | Secret. Cloud browser. |
-| `ELEVENLABS_AGENT_ID` | Dashboard id. `.env.example` only. |
-| `BROWSERBASE_PROJECT_ID` | Dashboard id. Missing this uses a sample iframe and sample SERP text. |
+| `BROWSERBASE_API_KEY` | Secret. Cloud browser. The key selects the Browserbase project. |
+| `ELEVENLABS_AGENT_ID` | Dashboard id. Create an agent in ElevenLabs, then paste its id. |
 
 No FastBreak Dev Supabase. Email is not persisted.
 
 ## Flaws (known)
 
 - `pnpm install` needs `GITHUB_TOKEN` for GitHub Packages (`@fastbreak-amateur/fb-toolkit`).
-- Agent id and Browserbase project id are not Cursor app secrets; published voice/live view stay idle or sample until those are in the host env.
+- Agent id is not a Cursor app secret; published voice stays idle until `ELEVENLABS_AGENT_ID` is in the host env. Missing `BROWSERBASE_API_KEY` uses a sample iframe.
 - Playwright `connectOverCDP` from a serverless host can time out; search then fails and the agent should park.
 - In-memory session close is best-effort. New demo start requests Browserbase `REQUEST_RELEASE` on the previous id from the client.
 - Google consent walls can block typing until a human updates selectors.
