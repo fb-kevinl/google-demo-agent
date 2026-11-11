@@ -1,7 +1,18 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Volume2, VolumeX } from "lucide-react";
+import {
+  Building2,
+  Calendar,
+  Check,
+  ChevronDown,
+  MapPin,
+  Sparkles,
+  Trophy,
+  Users,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import type { RefObject } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -26,8 +37,6 @@ import {
   FormLabel,
   FormMessage,
   Input,
-  PageHeader,
-  Separator,
   Spinner,
 } from "@fastbreak-amateur/fb-toolkit/client";
 
@@ -59,38 +68,208 @@ function BrandMark() {
     <span className="inline-flex items-center gap-2 font-bold">
       <FastbreakLogo className="h-5 w-auto" />
       <span>
-        Fastbreak <span className="font-normal text-muted-foreground">AI Demo</span>
+        Fastbreak <span className="font-normal text-muted-foreground">AI</span>
       </span>
     </span>
   );
 }
 
+const SOLUTIONS = [
+  {
+    icon: Trophy,
+    title: "Amateur & Youth Sports",
+    description:
+      "Powerful registration, scheduling, ticketing, and event management for youth, high school, and amateur sports leagues & tournaments.",
+  },
+  {
+    icon: Calendar,
+    title: "Professional Sports",
+    description:
+      "Advanced AI schedule creation and optimization for leagues with Pro Schedule, and teams with Perform.",
+  },
+  {
+    icon: Building2,
+    title: "Brands & Agencies",
+    description:
+      "Connect with youth athletes and their families through scalable on-site activations, branded experiences, and tournament sponsorships.",
+  },
+  {
+    icon: MapPin,
+    title: "Sports Tourism",
+    description:
+      "Maximize tourism revenue and strengthen relationships with event organizers through real-time, event-specific impact analysis.",
+  },
+] as const;
+
+const PILLARS = [
+  {
+    title: "Smarter Scheduling",
+    description: "AI-driven optimization for fairness and efficiency.",
+  },
+  {
+    title: "Less Travel, More Play",
+    description: "Reduce unnecessary travel to lower costs and fatigue.",
+  },
+  {
+    title: "Maximize Revenue",
+    description: "Integrate sponsors to fund more events and programs.",
+  },
+  {
+    title: "Seamless Operations",
+    description: "Streamline logistics and simplify event management.",
+  },
+] as const;
+
 export function DashboardScreen({ onStartDemo }: { onStartDemo: () => void }) {
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <header className="flex h-[52px] items-center gap-3.5 border-b bg-background px-6">
-        <BrandMark />
-      </header>
-      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-6">
-        <PageHeader title="Dashboard" />
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-xl font-semibold">Take our AI demo</CardTitle>
-              <Badge variant="secondary">3-minute live walkthrough</Badge>
-            </div>
-            <CardDescription>
-              Watch an AI agent control a live browser and run Google searches in real time while
-              walking you through the results.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="items-start">
-            <Button size="lg" onClick={onStartDemo}>
+    <div className="flex min-h-full flex-1 flex-col bg-background">
+      <div className="rounded-b-[48px] bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 pb-16 text-white">
+        <header className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <div className="flex items-center gap-8">
+            <span className="inline-flex items-center gap-2 font-bold text-white">
+              <FastbreakLogo className="h-5 w-auto" />
+              <span>
+                Fastbreak <span className="font-normal text-cyan-300">AI</span>
+              </span>
+            </span>
+            <nav className="hidden items-center gap-6 text-sm font-medium text-slate-300 md:flex">
+              <span className="inline-flex items-center gap-1 hover:text-white">
+                Pro Sports <ChevronDown className="size-3.5" />
+              </span>
+              <span className="inline-flex items-center gap-1 hover:text-white">
+                Amateur & Youth <ChevronDown className="size-3.5" />
+              </span>
+              <span className="hover:text-white">Brands</span>
+              <span className="hover:text-white">Tourism</span>
+              <span className="inline-flex items-center gap-1 hover:text-white">
+                Company <ChevronDown className="size-3.5" />
+              </span>
+            </nav>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-cyan-400/40 bg-white/10 text-white hover:bg-white/20"
+              onClick={onStartDemo}
+            >
+              <Sparkles className="mr-1.5 size-3.5 text-cyan-300" />
               Take our AI demo
             </Button>
-          </CardFooter>
-        </Card>
-      </main>
+            <Button size="sm">Contact sales</Button>
+          </div>
+        </header>
+
+        <section className="mx-auto mt-10 grid max-w-6xl grid-cols-1 items-center gap-10 px-6 lg:grid-cols-12">
+          <div className="space-y-5 lg:col-span-7">
+            <Badge className="bg-cyan-400/15 text-cyan-300 hover:bg-cyan-400/20">
+              Pro + Youth Sports Operations & Scheduling
+            </Badge>
+            <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
+              AI-powered software for the people who make sports exceptional
+            </h1>
+            <p className="max-w-xl text-base text-slate-300">
+              Intelligent software for sports league scheduling, tournament management, travel,
+              ticketing, and experiential sponsorship for brands.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Button size="lg" onClick={onStartDemo}>
+                <Sparkles className="mr-2 size-4" />
+                Take our AI demo
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/25 bg-white/5 text-white hover:bg-white/15"
+              >
+                Explore solutions
+              </Button>
+            </div>
+          </div>
+
+          <div className="lg:col-span-5">
+            <Card className="border-white/15 bg-white/95 text-foreground shadow-2xl">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <Badge variant="success">Live Interactive POC</Badge>
+                  <span className="text-xs text-muted-foreground">3-minute session</span>
+                </div>
+                <CardTitle className="mt-2 text-lg font-semibold">
+                  Try the live Fastbreak AI agent
+                </CardTitle>
+                <CardDescription>
+                  Watch our AI agent control a live browser and answer questions in real time.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2.5 text-sm">
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+                  <Users className="size-4 text-primary" />
+                  <span>Voice + text walkthrough with an AI agent</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+                  <Sparkles className="size-4 text-primary" />
+                  <span>Live watch-only browser session</span>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full" size="lg" onClick={onStartDemo}>
+                  Take our AI demo
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </section>
+      </div>
+
+      <section className="mx-auto w-full max-w-6xl px-6 py-14">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold tracking-wider text-primary uppercase">
+            01 · Select Your Interest
+          </p>
+          <h2 className="mt-1 text-2xl font-bold">AI-driven solutions to power your game</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            From professional leagues to youth tournaments, Fastbreak helps you optimize
+            scheduling, enhance engagement, and maximize impact.
+          </p>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {SOLUTIONS.map(({ icon: Icon, title, description }) => (
+            <Card key={title}>
+              <CardHeader>
+                <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Icon className="size-5" />
+                </div>
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="border-t bg-muted/30 py-14">
+        <div className="mx-auto w-full max-w-6xl px-6">
+          <p className="text-xs font-semibold tracking-wider text-primary uppercase">
+            02 · Why Fastbreak
+          </p>
+          <h2 className="mt-1 text-2xl font-bold">Optimizing sports operations</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Each product is purpose-built to simplify operations, unlock new revenue, and help
+            organizations run faster, smarter, and more efficiently.
+          </p>
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {PILLARS.map((pillar) => (
+              <Card key={pillar.title}>
+                <CardHeader>
+                  <CardTitle>{pillar.title}</CardTitle>
+                  <CardDescription>{pillar.description}</CardDescription>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -234,19 +413,15 @@ export function PrepScreen({
 export function EndScreen({
   email,
   endedByCap,
-  searches,
-  questions,
   onStartOver,
 }: {
   email: string;
   endedByCap: boolean;
-  searches: string[];
-  questions: Line[];
   onStartOver: () => void;
 }) {
   return (
     <main className="flex min-h-full flex-1 items-center justify-center p-6">
-      <Card className="w-full max-w-[560px]">
+      <Card className="w-full max-w-[440px]">
         <CardHeader>
           <div className="mb-2">
             <BrandMark />
@@ -255,39 +430,15 @@ export function EndScreen({
             {endedByCap ? "The demo reached its 3-minute limit" : "Demo finished"}
           </CardTitle>
           <CardDescription>
-            Thanks for watching the live AI demo. Here is a summary of your session.
+            Thanks for watching the live Fastbreak AI demo.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-xl border bg-muted/40 p-4">
-            <div className="flex items-center justify-between">
-              <p className="font-semibold">What you saw</p>
-              <Badge variant="outline">Session summary</Badge>
-            </div>
-            <ul className="mt-2 list-disc space-y-0.5 pl-4 text-sm">
-              {searches.length ? (
-                searches.map((q) => <li key={q}>Google search: {q}</li>)
-              ) : (
-                <li className="text-muted-foreground">No searches run.</li>
-              )}
-            </ul>
-            <Separator className="my-3" />
-            <p className="font-semibold">Your messages</p>
-            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm">
-              {questions.length ? (
-                questions.map((q, i) => <li key={`${i}-${q.text}`}>{q.text}</li>)
-              ) : (
-                <li className="text-muted-foreground">No messages sent.</li>
-              )}
-            </ul>
-          </div>
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Session email: {email}</p>
-            <Button variant="outline" size="sm" onClick={onStartOver}>
-              Back to dashboard
-            </Button>
-          </div>
-        </CardContent>
+        <CardFooter className="flex-row items-center justify-between border-t pt-4">
+          <p className="text-xs text-muted-foreground">{email}</p>
+          <Button variant="outline" size="sm" onClick={onStartOver}>
+            Back to home
+          </Button>
+        </CardFooter>
       </Card>
     </main>
   );

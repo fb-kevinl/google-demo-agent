@@ -340,8 +340,6 @@ function SessionShell({
       <EndScreen
         email={email}
         endedByCap={endedByCap}
-        searches={searches}
-        questions={lines.filter((l) => l.role === "user")}
         onStartOver={onStartOver}
       />
     );
