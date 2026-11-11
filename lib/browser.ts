@@ -41,7 +41,46 @@ export function isBrowserConfigured() {
   return Boolean(apiKey());
 }
 
+type LiveStore = { ids: Set<string>; hooked?: boolean };
+
+function liveStore() {
+  const g = globalThis as typeof globalThis & { __bbLive?: LiveStore };
+  g.__bbLive ??= { ids: new Set() };
+  return g.__bbLive;
+}
+
+function trackSession(sessionId: string) {
+  liveStore().ids.add(sessionId);
+  hookShutdown();
+}
+
+function hookShutdown() {
+  const store = liveStore();
+  if (store.hooked) return;
+  store.hooked = true;
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    const others = process.listeners(signal);
+    process.removeAllListeners(signal);
+    process.once(signal, () => {
+      const ids = [...liveStore().ids];
+      liveStore().ids.clear();
+      const pending = Promise.all(ids.map((id) => releaseSession(id)));
+      const timer = setTimeout(() => finish(signal, others), 2500);
+      void pending.finally(() => {
+        clearTimeout(timer);
+        finish(signal, others);
+      });
+    });
+  }
+}
+
+function finish(signal: NodeJS.Signals, others: NodeJS.SignalsListener[]) {
+  for (const listener of others) listener(signal);
+  process.exit(0);
+}
+
 export async function releaseSession(sessionId: string) {
+  liveStore().ids.delete(sessionId);
   if (!apiKey() || sessionId.startsWith("mock-")) return;
   try {
     await client().sessions.update(sessionId, { status: "REQUEST_RELEASE" });
@@ -70,11 +109,17 @@ export async function startLiveSession(previousId?: string | null): Promise<Live
       allowedDomains: ["google.com"],
     },
   });
+  trackSession(session.id);
 
-  await withPage(session.id, async (p) => {
-    await p.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 25000 });
-    await dismissConsent(p);
-  });
+  try {
+    await withPage(session.id, async (p) => {
+      await p.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 25000 });
+      await dismissConsent(p);
+    });
+  } catch (error) {
+    await releaseSession(session.id);
+    throw error;
+  }
 
   const debug = await client().sessions.debug(session.id);
   const liveViewUrl = appendNavbarFalse(debug.debuggerFullscreenUrl);
