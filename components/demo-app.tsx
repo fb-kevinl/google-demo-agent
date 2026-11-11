@@ -3,6 +3,7 @@
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { FIRST_MESSAGE } from "@/lib/agent-config";
 import { createAgentSpeech, unlockDemoAudio } from "@/lib/agent-speech";
 import {
   DemoLayout,
@@ -86,10 +87,13 @@ function SessionShell({
   onStartOver: () => void;
 }) {
   const speakReplyRef = useRef<(text: string) => void>(() => {});
+  const greetedRef = useRef(false);
   const conversation = useConversation({
     onMessage: (payload) => {
       const text = payload.message?.trim();
       if (!text || payload.role === "user") return;
+      if (greetedRef.current && text === FIRST_MESSAGE) return;
+      greetedRef.current = true;
       setAwaiting(false);
       setLines((prev) => [...prev, { role: "agent", text }]);
       speakReplyRef.current(text);
@@ -172,6 +176,7 @@ function SessionShell({
     setBrowser(null);
     setBrowserError(null);
     setLines([]);
+    greetedRef.current = false;
     setHadVoice(false);
     setMuted(false);
     setPrepIndex(0);
@@ -243,6 +248,13 @@ function SessionShell({
     const id = window.setTimeout(() => setPhase("demo"), 400);
     return () => window.clearTimeout(id);
   }, [phase, prepReady, prepIndex]);
+
+  useEffect(() => {
+    if (phase !== "demo" || greetedRef.current) return;
+    greetedRef.current = true;
+    setLines([{ role: "agent", text: FIRST_MESSAGE }]);
+    speakReplyRef.current(FIRST_MESSAGE);
+  }, [phase]);
 
   useEffect(() => {
     if (phase !== "demo") return;
