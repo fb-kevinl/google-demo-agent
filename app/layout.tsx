@@ -14,17 +14,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FastBreak Google demo",
-  description: "Watch-only ElevenLabs agent that searches google.com for you.",
+  title: "FastBreak AI demo",
+  description: "Watch a live FastBreak demo. An AI agent searches Google while you watch.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-background text-foreground">{children}</body>
+      <body className="flex min-h-full flex-col bg-[#fafafa] text-foreground">{children}</body>
     </html>
   );
 }

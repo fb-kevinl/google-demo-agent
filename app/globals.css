@@ -4,3 +4,68 @@ html,
 body {
   height: 100%;
 }
+
+@keyframes demo-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+@keyframes demo-wave {
+  50% {
+    height: 14px;
+  }
+}
+
+.demo-typing span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+  animation: demo-dot 1s infinite;
+}
+
+.demo-typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.demo-typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.demo-wave {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  height: 14px;
+}
+
+.demo-wave i {
+  width: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.demo-speaking .demo-wave i {
+  animation: demo-wave 0.8s infinite ease-in-out;
+}
+
+.demo-wave i:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.demo-wave i:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.demo-wave i:nth-child(4) {
+  animation-delay: 0.3s;
+}
