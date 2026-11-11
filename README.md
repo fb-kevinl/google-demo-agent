@@ -2,15 +2,16 @@
 
 Watch-only sales demo: email gate, then an ElevenLabs agent searches [google.com](https://www.google.com) in a Browserbase live view. Visitors never click the iframe.
 
-Private `@fastbreak-amateur/fb-toolkit` was not available from this environment (GitHub Packages 404). UI is shadcn/ui with a dark FastBreak-like palette.
+UI is `@fastbreak-amateur/fb-toolkit` 5.17.0 (GitHub Packages). Set `GITHUB_TOKEN` with `read:packages` before install.
 
 ## Run locally
 
 ```bash
-npm install
+export GITHUB_TOKEN=ghp_...   # read:packages for @fastbreak-amateur/fb-toolkit
+pnpm install
 cp .env.example .env.local
 # fill ELEVENLABS_API_KEY, BROWSERBASE_API_KEY, ELEVENLABS_AGENT_ID, BROWSERBASE_PROJECT_ID
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:4317](http://localhost:4317). Enter any email (it is discarded). Start voice. Ask the guide to search.
@@ -40,7 +41,7 @@ No FastBreak Dev Supabase. Email is not persisted.
 
 ## Flaws (known)
 
-- GitHub Packages auth is required to swap shadcn for fb-toolkit 5.17.0.
+- `pnpm install` needs `GITHUB_TOKEN` for GitHub Packages (`@fastbreak-amateur/fb-toolkit`).
 - Agent id and Browserbase project id are not Cursor app secrets; published voice/live view stay idle or sample until those are in the host env.
 - Playwright `connectOverCDP` from a serverless host can time out; search then fails and the agent should park.
 - In-memory session close is best-effort. New demo start requests Browserbase `REQUEST_RELEASE` on the previous id from the client.
