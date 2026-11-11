@@ -1,15 +1,24 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Volume2, VolumeX } from "lucide-react";
 import type { RefObject } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import {
+  Alert,
+  AlertBody,
+  AlertHeader,
   Badge,
   Button,
   Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  FastbreakLogo,
   Form,
   FormControl,
   FormField,
@@ -17,19 +26,20 @@ import {
   FormLabel,
   FormMessage,
   Input,
+  PageHeader,
+  Separator,
+  Spinner,
 } from "@fastbreak-amateur/fb-toolkit/client";
 
 export const PREP_STEPS = [
   "Saving your email",
   "Opening google.com",
   "Starting the live view",
-  "Starting the AI guide",
+  "Starting the AI agent",
 ] as const;
 
-export const CHIPS = ["Search Wikipedia", "What is FastBreak?", "Who is it for?"];
-
 const emailSchema = z.object({
-  email: z.string().email("Enter an email like name@club.com."),
+  email: z.string().email("Enter an email like name@company.com."),
 });
 
 type EmailValues = z.infer<typeof emailSchema>;
@@ -44,7 +54,54 @@ export function fmt(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export function EmailGate({ onContinue }: { onContinue: (email: string) => void }) {
+function BrandMark() {
+  return (
+    <span className="inline-flex items-center gap-2 font-bold">
+      <FastbreakLogo className="h-5 w-auto" />
+      <span>
+        Fastbreak <span className="font-normal text-muted-foreground">AI Demo</span>
+      </span>
+    </span>
+  );
+}
+
+export function DashboardScreen({ onStartDemo }: { onStartDemo: () => void }) {
+  return (
+    <div className="flex min-h-full flex-1 flex-col">
+      <header className="flex h-[52px] items-center gap-3.5 border-b bg-background px-6">
+        <BrandMark />
+      </header>
+      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-6">
+        <PageHeader title="Dashboard" />
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-xl font-semibold">Take our AI demo</CardTitle>
+              <Badge variant="secondary">3-minute live walkthrough</Badge>
+            </div>
+            <CardDescription>
+              Watch an AI agent control a live browser and run Google searches in real time while
+              walking you through the results.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="items-start">
+            <Button size="lg" onClick={onStartDemo}>
+              Take our AI demo
+            </Button>
+          </CardFooter>
+        </Card>
+      </main>
+    </div>
+  );
+}
+
+export function EmailGate({
+  onBack,
+  onContinue,
+}: {
+  onBack: () => void;
+  onContinue: (email: string) => void;
+}) {
   const form = useForm<EmailValues>({
     resolver: zodResolver(emailSchema),
     defaultValues: { email: "" },
@@ -52,22 +109,26 @@ export function EmailGate({ onContinue }: { onContinue: (email: string) => void 
 
   return (
     <main className="flex min-h-full flex-1 items-center justify-center p-6">
-      <Card className="w-full max-w-[420px] gap-0 py-0">
-        <div className="p-7">
-          <p className="text-lg font-bold">
-            FastBreak <span className="font-normal text-muted-foreground">AI demo</span>
-          </p>
-          <h1 className="mt-4 text-[22px] font-semibold tracking-tight">Watch a live FastBreak demo</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            See the AI guide search Google on a live screen. It takes a few minutes.
-          </p>
-          <p className="mt-4 rounded-lg border bg-[#fafafa] p-3 text-sm">
-            Your guide is an AI agent, not a person. It talks and types, and it controls the
-            screen while you watch.
-          </p>
+      <Card className="w-full max-w-[420px]">
+        <CardHeader>
+          <div className="mb-2">
+            <BrandMark />
+          </div>
+          <CardTitle className="text-xl font-semibold">Watch a live Fastbreak AI demo</CardTitle>
+          <CardDescription>
+            See the AI agent search Google on a live screen. The session lasts up to 3 minutes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert variant="info">
+            <AlertBody>
+              Your guide is an AI agent, not a person. It speaks, responds to your questions, and
+              controls the screen while you watch.
+            </AlertBody>
+          </Alert>
           <Form {...form}>
             <form
-              className="mt-5"
+              className="space-y-4"
               noValidate
               onSubmit={form.handleSubmit((values) => onContinue(values.email))}
             >
@@ -76,23 +137,33 @@ export function EmailGate({ onContinue }: { onContinue: (email: string) => void 
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel required>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" autoComplete="email" placeholder="you@club.com" {...field} />
+                      <Input
+                        type="email"
+                        autoComplete="email"
+                        placeholder="you@company.com"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="mt-4 w-full">
-                Start demo
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={onBack}>
+                  Back
+                </Button>
+                <Button type="submit" className="flex-1">
+                  Start demo
+                </Button>
+              </div>
             </form>
           </Form>
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             We use your email for this session only. This POC does not save it.
           </p>
-        </div>
+        </CardContent>
       </Card>
     </main>
   );
@@ -111,11 +182,13 @@ export function PrepScreen({
 }) {
   return (
     <main className="flex min-h-full flex-1 items-center justify-center p-6">
-      <Card className="w-full max-w-[420px] gap-0 py-0">
-        <div className="p-7">
-          <h2 className="text-lg font-semibold">Setting up your demo</h2>
-          <p className="mt-1 text-sm text-muted-foreground">This takes 10 to 30 seconds.</p>
-          <div className="mt-4 space-y-1">
+      <Card className="w-full max-w-[420px]">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">Setting up your demo</CardTitle>
+          <CardDescription>This takes 10 to 30 seconds.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
             {PREP_STEPS.map((label, i) => {
               const done = i < prepIndex;
               const run = i === prepIndex;
@@ -134,23 +207,25 @@ export function PrepScreen({
                     }`}
                   >
                     {done ? <Check className="size-3" /> : null}
-                    {run ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                    {run ? <Spinner className="size-3.5" /> : null}
                   </span>
                   {label}
                 </div>
               );
             })}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">{prepTick}s</p>
+          <p className="text-xs text-muted-foreground">{prepTick}s</p>
           {prepSlow ? (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-sm">
-              Setup is taking longer than normal.{" "}
-              <Button size="sm" className="ml-2" onClick={onRetry}>
-                Try again
-              </Button>
-            </div>
+            <Alert variant="warning">
+              <AlertBody className="flex items-center justify-between gap-2">
+                <span>Setup is taking longer than normal.</span>
+                <Button size="sm" variant="outline" onClick={onRetry}>
+                  Try again
+                </Button>
+              </AlertBody>
+            </Alert>
           ) : null}
-        </div>
+        </CardContent>
       </Card>
     </main>
   );
@@ -171,47 +246,49 @@ export function EndScreen({
 }) {
   return (
     <main className="flex min-h-full flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-[560px]">
-        <Card className="gap-0 py-0">
-          <div className="p-7">
-            <h2 className="text-xl font-semibold">
-              {endedByCap ? "The demo reached its 12-minute limit" : "Demo finished"}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Want to talk about how this fits your club? Our team can walk through it with you.
-            </p>
-            <Button size="lg" className="mt-4" asChild>
-              <a href="#CALENDAR-LINK-TBD">Book a time with our team</a>
-            </Button>
-            <div className="mt-4 rounded-xl border bg-[#fafafa] p-4">
-              <div className="flex items-center">
-                <p className="font-semibold">What you saw</p>
-                <span className="flex-1" />
-                <Badge variant="outline">Demo data</Badge>
-              </div>
-              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-sm">
-                {searches.length ? (
-                  searches.map((q) => <li key={q}>Google search: {q}</li>)
-                ) : (
-                  <li className="text-muted-foreground">No searches run.</li>
-                )}
-              </ul>
-              <p className="mt-3 font-semibold">Your questions</p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm">
-                {questions.length ? (
-                  questions.map((q, i) => <li key={`${i}-${q.text}`}>“{q.text}”</li>)
-                ) : (
-                  <li className="text-muted-foreground">No questions asked.</li>
-                )}
-              </ul>
-            </div>
-            <Button variant="outline" size="sm" className="mt-4" onClick={onStartOver}>
-              Start over
-            </Button>
-            <p className="mt-3 text-xs text-muted-foreground">Session email: {email}</p>
+      <Card className="w-full max-w-[560px]">
+        <CardHeader>
+          <div className="mb-2">
+            <BrandMark />
           </div>
-        </Card>
-      </div>
+          <CardTitle className="text-xl font-semibold">
+            {endedByCap ? "The demo reached its 3-minute limit" : "Demo finished"}
+          </CardTitle>
+          <CardDescription>
+            Thanks for watching the live AI demo. Here is a summary of your session.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-xl border bg-muted/40 p-4">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">What you saw</p>
+              <Badge variant="outline">Session summary</Badge>
+            </div>
+            <ul className="mt-2 list-disc space-y-0.5 pl-4 text-sm">
+              {searches.length ? (
+                searches.map((q) => <li key={q}>Google search: {q}</li>)
+              ) : (
+                <li className="text-muted-foreground">No searches run.</li>
+              )}
+            </ul>
+            <Separator className="my-3" />
+            <p className="font-semibold">Your messages</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm">
+              {questions.length ? (
+                questions.map((q, i) => <li key={`${i}-${q.text}`}>{q.text}</li>)
+              ) : (
+                <li className="text-muted-foreground">No messages sent.</li>
+              )}
+            </ul>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Session email: {email}</p>
+            <Button variant="outline" size="sm" onClick={onStartOver}>
+              Back to dashboard
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </main>
   );
 }
@@ -262,9 +339,7 @@ export function DemoLayout({
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="flex h-[52px] items-center gap-3.5 border-b bg-background px-4">
-        <span className="font-bold">
-          FastBreak <span className="font-normal text-muted-foreground">AI demo</span>
-        </span>
+        <BrandMark />
         <span className="flex-1" />
         <span className="hidden text-sm text-muted-foreground sm:inline">
           Time left <b className="text-foreground">{fmt(secs)}</b>
@@ -274,69 +349,69 @@ export function DemoLayout({
         </Button>
       </header>
       {warn ? (
-        <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm">
-          <b>1 minute left.</b>
-          <span>The demo ends at 3 minutes.</span>
-          <span className="flex-1" />
-          <Button variant="outline" size="sm" onClick={onEnd}>
-            End now
-          </Button>
-        </div>
+        <Alert variant="warning" className="rounded-none border-b px-4 py-2">
+          <AlertBody className="flex items-center justify-between gap-3">
+            <span>
+              <b>1 minute left.</b> The demo ends at 3 minutes.
+            </span>
+            <Button variant="outline" size="sm" onClick={onEnd}>
+              End now
+            </Button>
+          </AlertBody>
+        </Alert>
       ) : null}
       {lost ? (
-        <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 px-4 py-2 text-sm">
-          <b>Connection lost.</b>
-          <span>The demo screen stopped updating.</span>
-          <span className="flex-1" />
-          <Button size="sm" onClick={onRestart}>
-            Restart demo
-          </Button>
-        </div>
+        <Alert variant="error" className="rounded-none border-b px-4 py-2">
+          <AlertBody className="flex items-center justify-between gap-3">
+            <span>
+              <b>Connection lost.</b> The demo screen stopped updating.
+            </span>
+            <Button size="sm" onClick={onRestart}>
+              Restart demo
+            </Button>
+          </AlertBody>
+        </Alert>
       ) : null}
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:h-[calc(100vh-52px)] lg:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]">
         <Card className="flex min-h-0 flex-col gap-0 overflow-hidden py-0">
           <div className="flex items-center gap-2 border-b px-3 py-2">
             <Badge variant={browserError ? "destructive" : browser ? "success" : "secondary"}>
-              <span
-                className={`size-2 rounded-full ${browserError ? "bg-red-600" : browser ? "bg-green-600" : "bg-neutral-400"}`}
-              />
               {browserError ? "Not connected" : browser ? "Live" : "Loading"}
             </Badge>
-            <span className="text-xs text-muted-foreground">View only. The agent controls this screen.</span>
+            <span className="text-xs text-muted-foreground">
+              View only. The AI agent controls this screen.
+            </span>
           </div>
-          <div className="relative m-3 flex min-h-[240px] flex-1 items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-neutral-300 bg-[repeating-linear-gradient(45deg,#fafafa_0_12px,#f5f5f5_12px_24px)] lg:min-h-0">
+          <div className="relative m-3 flex min-h-[240px] flex-1 items-center justify-center overflow-hidden rounded-lg border bg-muted/30 lg:min-h-0">
             {browserError ? (
               <div className="px-6 text-center">
-                <p className="font-semibold text-neutral-600">Live view failed</p>
+                <p className="font-semibold">Live view failed</p>
                 <p className="mt-1 text-sm text-muted-foreground">{browserError}</p>
               </div>
             ) : !browser ? (
-              <div className="px-6 text-center">
-                <p className="font-semibold text-neutral-600">Live view</p>
-                <p className="mt-1 text-sm text-muted-foreground">Opening google.com…</p>
+              <div className="flex flex-col items-center gap-2 px-6 text-center">
+                <Spinner className="size-5 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Opening google.com...</p>
               </div>
             ) : (
               <iframe
                 title="Google live view"
                 src={browser.liveViewUrl}
-                className="absolute inset-0 h-full w-full border-0 pointer-events-none"
+                className="pointer-events-none absolute inset-0 h-full w-full border-0"
                 allow="clipboard-read"
               />
             )}
-            <span className="absolute right-2.5 bottom-2.5 rounded-md border bg-white/90 px-2 py-0.5 text-xs text-neutral-600">
-              Demo session. Not your data.
-            </span>
             {lost ? (
-              <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/80">
-                <Card className="max-w-[280px] gap-0 py-0">
-                  <div className="p-4 text-center">
+              <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/80">
+                <Card className="max-w-[280px]">
+                  <CardContent className="space-y-2 text-center">
                     <p className="font-semibold">Connection lost</p>
-                    <p className="mt-1 text-xs text-muted-foreground">The screen stopped updating.</p>
-                    <Button size="sm" className="mt-2.5" onClick={onRestart}>
+                    <p className="text-xs text-muted-foreground">The screen stopped updating.</p>
+                    <Button size="sm" onClick={onRestart}>
                       Restart demo
                     </Button>
-                  </div>
+                  </CardContent>
                 </Card>
               </div>
             ) : null}
@@ -344,38 +419,56 @@ export function DemoLayout({
         </Card>
 
         <Card className="flex min-h-0 flex-col gap-0 overflow-hidden py-0">
-          <div className="border-b px-3 py-3">
+          <div className="flex items-center justify-between border-b px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold">Google search</p>
-              <span className="text-xs text-muted-foreground">
-                {searches.length ? `${searches.length} search${searches.length === 1 ? "" : "es"}` : "Watch only"}
-              </span>
+              <p className="text-sm font-semibold">AI Agent</p>
+              <Badge variant="outline" className={isSpeaking ? "demo-speaking" : ""}>
+                <span className="demo-wave mr-1">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                {agentLabel}
+              </Badge>
             </div>
+            <Button
+              type="button"
+              variant={isMuted ? "destructive" : "outline"}
+              size="sm"
+              aria-pressed={isMuted}
+              onClick={onToggleMute}
+            >
+              {isMuted ? <VolumeX className="mr-1.5 size-3.5" /> : <Volume2 className="mr-1.5 size-3.5" />}
+              {isMuted ? "Unmute" : "Mute"}
+            </Button>
           </div>
-          <div ref={txRef} className="flex min-h-[240px] flex-1 flex-col gap-2 overflow-auto p-3 lg:min-h-0" aria-live="polite">
+
+          <div
+            ref={txRef}
+            className="flex min-h-[240px] flex-1 flex-col gap-2 overflow-auto p-3 lg:min-h-0"
+            aria-live="polite"
+          >
             {lines.length === 0 ? (
               <p className="self-center text-xs text-muted-foreground">
-                {connected ? "The guide will speak first." : "Connecting the AI guide…"}
+                {connected ? "The AI agent will speak first." : "Connecting the AI agent..."}
               </p>
             ) : (
               lines.map((line, i) => (
                 <div
                   key={`${i}-${line.text.slice(0, 16)}`}
                   className={`max-w-[88%] rounded-[10px] px-3 py-2 text-sm ${
-                    line.role === "user" ? "self-end bg-foreground text-background" : "self-start bg-neutral-100"
+                    line.role === "user"
+                      ? "self-end bg-foreground text-background"
+                      : "self-start bg-muted"
                   }`}
                 >
-                  {line.role === "agent" ? (
-                    <span className="mb-0.5 block text-[11px] text-muted-foreground">
-                      Agent{isMuted ? "" : " · voice and text"}
-                    </span>
-                  ) : null}
                   {line.text}
                 </div>
               ))
             )}
             {connected && awaiting && lines.at(-1)?.role !== "agent" ? (
-              <div className="max-w-[88%] self-start rounded-[10px] bg-neutral-100 px-3 py-2">
+              <div className="max-w-[88%] self-start rounded-[10px] bg-muted px-3 py-2">
                 <span className="demo-typing">
                   <span />
                   <span />
@@ -384,50 +477,26 @@ export function DemoLayout({
               </div>
             ) : null}
           </div>
-          {connected ? (
-            <div className="flex flex-wrap gap-1.5 px-3 pb-2">
-              {CHIPS.map((chip) => (
-                <button
-                  key={chip}
-                  type="button"
-                  className="rounded-full border bg-background px-2.5 py-0.5 text-xs hover:bg-neutral-100"
-                  onClick={() => onSend(chip)}
-                >
-                  {chip}
-                </button>
-              ))}
+
+          {voiceError ? (
+            <div className="px-3 pb-2">
+              <Alert variant="error">
+                <AlertHeader className="text-xs">{voiceError}</AlertHeader>
+              </Alert>
             </div>
           ) : null}
-          <div className="flex items-center gap-2 border-t px-3 py-3">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full border bg-background px-2 py-0.5 text-xs ${isSpeaking ? "demo-speaking" : ""}`}
-            >
-              <span className="demo-wave">
-                <i />
-                <i />
-                <i />
-                <i />
-              </span>
-              {agentLabel}
-            </span>
-            <span className="flex-1" />
-            <button
-              type="button"
-              aria-pressed={isMuted}
-              onClick={onToggleMute}
-              className={`inline-flex items-center gap-1.5 rounded-lg border bg-background px-2.5 py-2 text-[13px] ${
-                isMuted ? "border-red-200 bg-red-50 text-red-600" : ""
-              }`}
-            >
-              {isMuted ? "Muted. Unmute" : "Voice on. Mute"}
-            </button>
-          </div>
-          {voiceError ? <p className="px-3 pb-2 text-xs text-red-600">{voiceError}</p> : null}
-          <div className="flex items-center gap-2 px-3 pb-3">
+
+          <div className="flex items-center gap-2 border-t p-3">
             <Input
               value={draft}
               onChange={(e) => onDraft(e.target.value)}
-              placeholder={connected ? "Type a question, or a search" : "Connecting…"}
+              placeholder={
+                connected
+                  ? searches.length
+                    ? "Ask a question or try another search..."
+                    : "Ask the AI agent to search Google..."
+                  : "Connecting..."
+              }
               disabled={!connected}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {

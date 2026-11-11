@@ -1,8 +1,8 @@
-# FastBreak Google demo agent
+# Fastbreak AI Demo
 
-Watch-only sales demo: email gate, then an ElevenLabs agent searches [google.com](https://www.google.com) in a Browserbase live view. Visitors never click the iframe.
+Watch-only AI demo POC: dashboard, email gate, setup screen, live demo where an ElevenLabs AI agent searches [google.com](https://www.google.com) in a Browserbase live view, and an end summary screen. Visitors never click the iframe.
 
-UI is `@fastbreak-amateur/fb-toolkit` 5.17.0 (GitHub Packages). Set `GITHUB_TOKEN` with `read:packages` before install.
+UI uses `@fastbreak-amateur/fb-toolkit` 5.17.0 (GitHub Packages). Set `GITHUB_TOKEN` with `read:packages` before install.
 
 ## Run locally
 
@@ -14,11 +14,11 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-Open [http://localhost:4317](http://localhost:4317). Enter any email (it is discarded). Start voice. Ask the guide to search.
+Open [http://localhost:4317](http://localhost:4317). Click **Take our AI demo**, enter any email (it is discarded), and ask the AI agent to search.
 
 ## ElevenLabs agent
 
-Create an agent in ElevenAgents. Paste from `lib/agent-config.ts`:
+Create an agent in ElevenLabs. Paste from `lib/agent-config.ts`:
 
 - **First message:** `FIRST_MESSAGE`
 - **System prompt:** `SYSTEM_PROMPT`
@@ -32,11 +32,12 @@ Set `ELEVENLABS_AGENT_ID` to that agent. Restricted API key: ElevenAgents Read+W
 
 | Name | Role |
 | --- | --- |
-| `ELEVENLABS_API_KEY` | Secret. Conversation token. |
+| `ELEVENLABS_API_KEY` | Secret. Conversation token and TTS. |
 | `BROWSERBASE_API_KEY` | Secret. Cloud browser. The key selects the Browserbase project. |
 | `ELEVENLABS_AGENT_ID` | Dashboard id. Create an agent in ElevenLabs, then paste its id. |
 
-No FastBreak Dev Supabase. Email is not persisted.
+Email is not persisted.
+
 
 ## Flaws (known)
 

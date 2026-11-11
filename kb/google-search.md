@@ -8,4 +8,4 @@ In this session the agent may type a query and submit it on google.com. The agen
 
 Narrate only what is visible on the results page: titles and short snippets on screen. Do not quote long passages. Do not state Google ranking, ads policy, or unpublished product details.
 
-If a question is about FastBreak, pricing, or anything not on this page, do not answer from this document.
+If a question is about Fastbreak, pricing, or anything not on this page, do not answer from this document.

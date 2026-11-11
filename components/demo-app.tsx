@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FIRST_MESSAGE } from "@/lib/agent-config";
 import { createAgentSpeech, unlockDemoAudio } from "@/lib/agent-speech";
 import {
+  DashboardScreen,
   DemoLayout,
   EmailGate,
   EndScreen,
@@ -27,10 +28,17 @@ function googleQuery(text: string) {
 }
 
 export function DemoApp() {
+  const [started, setStarted] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+
+  if (!started) {
+    return <DashboardScreen onStartDemo={() => setStarted(true)} />;
+  }
+
   if (!email) {
     return (
       <EmailGate
+        onBack={() => setStarted(false)}
         onContinue={(value) => {
           unlockDemoAudio();
           setEmail(value);
@@ -38,7 +46,16 @@ export function DemoApp() {
       />
     );
   }
-  return <DemoSession email={email} onStartOver={() => setEmail(null)} />;
+
+  return (
+    <DemoSession
+      email={email}
+      onStartOver={() => {
+        setEmail(null);
+        setStarted(false);
+      }}
+    />
+  );
 }
 
 function DemoSession({ email, onStartOver }: { email: string; onStartOver: () => void }) {
@@ -153,7 +170,7 @@ function SessionShell({
         if (!res.ok) throw new Error("Speech failed.");
         speechRef.current.speak(await res.blob());
       } catch {
-        setVoiceError("The guide can chat, but speech did not play.");
+        setVoiceError("The AI agent can chat, but speech did not play.");
       }
     })();
   };

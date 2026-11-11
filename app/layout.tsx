@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FastBreak AI demo",
-  description: "Watch a live FastBreak demo. An AI agent searches Google while you watch.",
+  title: "Fastbreak AI Demo",
+  description: "Watch a live Fastbreak AI demo. An AI agent searches Google while you watch.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
