@@ -1,18 +1,22 @@
 import Browserbase from "@browserbasehq/sdk";
-import { chromium, type Page } from "playwright-core";
+import { chromium, type Browser, type Page } from "playwright-core";
 
 export type SearchResult = {
   ok: boolean;
-  mocked: boolean;
   narration: string;
   query?: string;
 };
 
 export type LiveSession = {
-  sessionId: string | null;
-  liveViewUrl: string | null;
-  mocked: boolean;
+  sessionId: string;
+  liveViewUrl: string;
   message: string;
+};
+
+type ActiveSession = {
+  browser: Browser;
+  page: Page;
+  connectUrl: string;
 };
 
 function apiKey() {
@@ -27,25 +31,12 @@ function connectUrl(sessionId: string) {
   return `wss://connect.browserbase.com?apiKey=${encodeURIComponent(apiKey())}&sessionId=${encodeURIComponent(sessionId)}`;
 }
 
-function mockSearch(query: string): SearchResult {
-  const q = query.trim() || "FastBreak";
-  return {
-    ok: true,
-    mocked: true,
-    query: q,
-    narration: `Sample results for “${q}” (Browserbase key is not set): 1) Wikipedia-style overview. 2) Recent headlines. 3) Official site snippet. Narrate only these sample titles; this is not a real SERP.`,
-  };
-}
-
-export function isBrowserConfigured() {
-  return Boolean(apiKey());
-}
-
-type LiveStore = { ids: Set<string>; hooked?: boolean };
+type LiveStore = { ids: Set<string>; pages: Map<string, ActiveSession>; hooked?: boolean };
 
 function liveStore() {
   const g = globalThis as typeof globalThis & { __bbLive?: LiveStore };
-  g.__bbLive ??= { ids: new Set() };
+  g.__bbLive ??= { ids: new Set(), pages: new Map() };
+  g.__bbLive.pages ??= new Map();
   return g.__bbLive;
 }
 
@@ -79,108 +70,121 @@ function finish(signal: NodeJS.Signals, others: NodeJS.SignalsListener[]) {
   process.exit(0);
 }
 
+function log(step: string, detail?: unknown) {
+  console.log(`[browserbase] ${step}`, detail ?? "");
+}
+
+function logErr(step: string, error: unknown) {
+  console.error(`[browserbase] ${step} failed:`, error);
+}
+
 export async function releaseSession(sessionId: string) {
-  liveStore().ids.delete(sessionId);
-  if (!apiKey() || sessionId.startsWith("mock-")) return;
+  log("release", { sessionId });
+  const store = liveStore();
+  store.ids.delete(sessionId);
+  const active = store.pages.get(sessionId);
+  store.pages.delete(sessionId);
+  if (active) await active.browser.close().catch(() => undefined);
+  if (!apiKey()) return;
   try {
     await client().sessions.update(sessionId, { status: "REQUEST_RELEASE" });
-  } catch {
-    // ponytail: best-effort release; stale sessions time out on Browserbase
+  } catch (error) {
+    logErr("release", error);
   }
 }
 
 export async function startLiveSession(previousId?: string | null): Promise<LiveSession> {
-  if (previousId) await releaseSession(previousId);
-  if (!isBrowserConfigured()) {
-    return {
-      sessionId: `mock-${Date.now()}`,
-      liveViewUrl: null,
-      mocked: true,
-      message: "Sample live view. Set BROWSERBASE_API_KEY to drive google.com.",
-    };
-  }
+  if (!apiKey()) throw new Error("BROWSERBASE_API_KEY is not set.");
 
+  const stale = new Set(liveStore().ids);
+  if (previousId) stale.add(previousId);
+  if (stale.size) await Promise.all([...stale].map((id) => releaseSession(id)));
+
+  log("creating session");
   const session = await client().sessions.create({
-    keepAlive: true,
-    api_timeout: 600,
+    api_timeout: 180,
     browserSettings: {
       viewport: { width: 1280, height: 800 },
       blockAds: true,
-      allowedDomains: ["google.com"],
     },
   });
+  log("session created", { id: session.id, status: session.status, hasConnectUrl: Boolean(session.connectUrl) });
   trackSession(session.id);
 
   try {
-    await withPage(session.id, async (p) => {
-      await p.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 25000 });
-      await dismissConsent(p);
-    });
+    log("connecting CDP", { id: session.id });
+    const page = await openPage(session.id, session.connectUrl);
+    log("goto google.com", { id: session.id });
+    await page.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 25000 });
+    await dismissConsent(page);
+    await injectCursor(page);
   } catch (error) {
+    logErr(`setup (${session.id})`, error);
     await releaseSession(session.id);
     throw error;
   }
 
   const debug = await client().sessions.debug(session.id);
-  const liveViewUrl = appendNavbarFalse(debug.debuggerFullscreenUrl);
+  const pageView = debug.pages?.[0]?.debuggerFullscreenUrl || debug.debuggerFullscreenUrl;
+  const liveViewUrl = appendNavbarFalse(pageView);
+  log("live view ready", { id: session.id, pages: debug.pages?.length ?? 0 });
 
   return {
     sessionId: session.id,
     liveViewUrl,
-    mocked: false,
     message: "Watch-only Google live view. The agent types; you do not click.",
   };
 }
 
 export async function searchGoogle(sessionId: string | null, query: string): Promise<SearchResult> {
   const q = query.trim().slice(0, 200);
-  if (!q) return { ok: false, mocked: false, narration: "Empty query. Ask the visitor what to search." };
-  if (!sessionId || sessionId.startsWith("mock-") || !isBrowserConfigured()) {
-    return mockSearch(q);
+  log("search requested", { sessionId, query: q });
+  if (!q) return { ok: false, narration: "Empty query. Ask the visitor what to search." };
+  if (!sessionId || !apiKey()) {
+    return { ok: false, narration: "No active Browserbase session." };
   }
 
   try {
-    return await withPage(sessionId, async (page) => {
-      await dismissConsent(page);
-      await injectCursor(page);
-      const box = page.locator('textarea[name="q"], input[name="q"]').first();
-      await box.waitFor({ state: "visible", timeout: 12000 });
-      await box.click();
-      await box.fill("");
-      await highlight(page, box);
-      await box.pressSequentially(q, { delay: 35 });
-      await box.press("Enter");
-      await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(1200);
-      const titles = (await page.locator("#search h3").allTextContents()).filter(Boolean).slice(0, 5);
-      const snippets = (await page.locator("#search .VwiC3b").allTextContents())
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, 5);
-      if (!titles.length) {
-        return {
-          ok: false,
-          mocked: false,
-          query: q,
-          narration: "Search ran but no result titles were visible. Park this and keep going.",
-        };
-      }
-      const lines = titles.map((t, i) => {
-        const snip = snippets[i] ? ` - ${snippets[i].slice(0, 140)}` : "";
-        return `${i + 1}) ${t}${snip}`;
-      });
+    const page = await openPage(sessionId);
+    log("search typing", { sessionId, url: page.url(), query: q });
+    await dismissConsent(page);
+    await injectCursor(page);
+    const box = page.locator('textarea[name="q"], input[name="q"]').first();
+    await box.waitFor({ state: "visible", timeout: 12000 });
+    await box.click();
+    await box.fill("");
+    await highlight(page, box);
+    await box.pressSequentially(q, { delay: 35 });
+    await box.press("Enter");
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1200);
+    const titles = (await page.locator("#search h3").allTextContents()).filter(Boolean).slice(0, 5);
+    const snippets = (await page.locator("#search .VwiC3b").allTextContents())
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+    log("search results", { sessionId, url: page.url(), titleCount: titles.length, titles });
+    if (!titles.length) {
       return {
-        ok: true,
-        mocked: false,
+        ok: false,
         query: q,
-        narration: `On-screen results for “${q}”: ${lines.join(" ")}`,
+        narration: "Search ran but no result titles were visible. Park this and keep going.",
       };
+    }
+    const lines = titles.map((t, i) => {
+      const snip = snippets[i] ? ` - ${snippets[i].slice(0, 140)}` : "";
+      return `${i + 1}) ${t}${snip}`;
     });
+    return {
+      ok: true,
+      query: q,
+      narration: `On-screen results for “${q}”: ${lines.join(" ")}`,
+    };
   } catch (error) {
+    logErr(`search (${sessionId})`, error);
     const message = error instanceof Error ? error.message : "Search failed.";
     return {
       ok: false,
-      mocked: false,
       query: q,
       narration: `Search failed (${message}). Retry once, then park.`,
     };
@@ -193,16 +197,18 @@ function appendNavbarFalse(url: string) {
   return u.toString();
 }
 
-async function withPage<T>(sessionId: string, fn: (page: Page) => Promise<T>): Promise<T> {
-  const browser = await chromium.connectOverCDP(connectUrl(sessionId));
-  try {
-    const context = browser.contexts()[0] ?? (await browser.newContext());
-    const page = context.pages()[0] ?? (await context.newPage());
-    await injectCursor(page);
-    return await fn(page);
-  } finally {
-    await browser.close();
+async function openPage(sessionId: string, url?: string): Promise<Page> {
+  const store = liveStore();
+  const existing = store.pages.get(sessionId);
+  if (existing && existing.browser.isConnected() && !existing.page.isClosed()) {
+    return existing.page;
   }
+  const ws = url || existing?.connectUrl || connectUrl(sessionId);
+  const browser = await chromium.connectOverCDP(ws);
+  const context = browser.contexts()[0] ?? (await browser.newContext());
+  const page = context.pages()[0] ?? (await context.newPage());
+  store.pages.set(sessionId, { browser, page, connectUrl: ws });
+  return page;
 }
 
 async function dismissConsent(page: Page) {

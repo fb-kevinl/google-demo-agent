@@ -35,9 +35,8 @@ const emailSchema = z.object({
 type EmailValues = z.infer<typeof emailSchema>;
 export type Line = { role: "user" | "agent"; text: string };
 export type BrowserState = {
-  sessionId: string | null;
-  liveViewUrl: string | null;
-  mocked: boolean;
+  sessionId: string;
+  liveViewUrl: string;
   message: string;
 };
 
@@ -223,14 +222,13 @@ export function DemoLayout({
   lost,
   browser,
   browserError,
-  mockQuery,
   searches,
   lines,
   draft,
   connected,
   isSpeaking,
   isMuted,
-  textOnly,
+  awaiting,
   agentLabel,
   voiceError,
   txRef,
@@ -245,14 +243,13 @@ export function DemoLayout({
   lost: boolean;
   browser: BrowserState | null;
   browserError: string | null;
-  mockQuery: string;
   searches: string[];
   lines: Line[];
   draft: string;
   connected: boolean;
   isSpeaking: boolean;
   isMuted: boolean;
-  textOnly: boolean;
+  awaiting: boolean;
   agentLabel: string;
   voiceError: string | null;
   txRef: RefObject<HTMLDivElement | null>;
@@ -278,8 +275,8 @@ export function DemoLayout({
       </header>
       {warn ? (
         <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm">
-          <b>2 minutes left.</b>
-          <span>The demo ends at 12 minutes.</span>
+          <b>1 minute left.</b>
+          <span>The demo ends at 3 minutes.</span>
           <span className="flex-1" />
           <Button variant="outline" size="sm" onClick={onEnd}>
             End now
@@ -300,11 +297,11 @@ export function DemoLayout({
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:h-[calc(100vh-52px)] lg:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]">
         <Card className="flex min-h-0 flex-col gap-0 overflow-hidden py-0">
           <div className="flex items-center gap-2 border-b px-3 py-2">
-            <Badge variant={browserError ? "destructive" : browser?.mocked ? "secondary" : "success"}>
+            <Badge variant={browserError ? "destructive" : browser ? "success" : "secondary"}>
               <span
-                className={`size-2 rounded-full ${browserError ? "bg-red-600" : browser?.mocked ? "bg-neutral-400" : "bg-green-600"}`}
+                className={`size-2 rounded-full ${browserError ? "bg-red-600" : browser ? "bg-green-600" : "bg-neutral-400"}`}
               />
-              {browserError ? "Not connected" : browser?.mocked ? "Sample" : browser ? "Live" : "Loading"}
+              {browserError ? "Not connected" : browser ? "Live" : "Loading"}
             </Badge>
             <span className="text-xs text-muted-foreground">View only. The agent controls this screen.</span>
           </div>
@@ -319,15 +316,13 @@ export function DemoLayout({
                 <p className="font-semibold text-neutral-600">Live view</p>
                 <p className="mt-1 text-sm text-muted-foreground">Opening google.com…</p>
               </div>
-            ) : browser.liveViewUrl ? (
+            ) : (
               <iframe
                 title="Google live view"
                 src={browser.liveViewUrl}
                 className="absolute inset-0 h-full w-full border-0 pointer-events-none"
                 allow="clipboard-read"
               />
-            ) : (
-              <MockGoogle query={mockQuery} />
             )}
             <span className="absolute right-2.5 bottom-2.5 rounded-md border bg-white/90 px-2 py-0.5 text-xs text-neutral-600">
               Demo session. Not your data.
@@ -372,14 +367,14 @@ export function DemoLayout({
                 >
                   {line.role === "agent" ? (
                     <span className="mb-0.5 block text-[11px] text-muted-foreground">
-                      Agent{isMuted || textOnly ? "" : " · voice and text"}
+                      Agent{isMuted ? "" : " · voice and text"}
                     </span>
                   ) : null}
                   {line.text}
                 </div>
               ))
             )}
-            {connected && isSpeaking && lines.at(-1)?.role !== "agent" ? (
+            {connected && awaiting && lines.at(-1)?.role !== "agent" ? (
               <div className="max-w-[88%] self-start rounded-[10px] bg-neutral-100 px-3 py-2">
                 <span className="demo-typing">
                   <span />
@@ -446,17 +441,6 @@ export function DemoLayout({
             </Button>
           </div>
         </Card>
-      </div>
-    </div>
-  );
-}
-
-function MockGoogle({ query }: { query: string }) {
-  return (
-    <div className="flex h-full w-full flex-col items-center bg-[#202124] px-6 py-10 text-[#e8eaed]">
-      <p className="mb-8 text-5xl font-medium tracking-tight">Google</p>
-      <div className="w-full max-w-xl rounded-full border border-white/15 px-5 py-3 text-sm">
-        {query || "Ask the guide to search. Sample results will appear here."}
       </div>
     </div>
   );

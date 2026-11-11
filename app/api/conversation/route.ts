@@ -22,17 +22,10 @@ export async function GET() {
   }
 
   const headers = { "xi-api-key": apiKey };
-  const tokenUrl = `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`;
-  const tokenRes = await fetch(tokenUrl, { headers, cache: "no-store" });
-  if (tokenRes.ok) {
-    const data = (await tokenRes.json()) as { token?: string; conversation_token?: string };
-    const conversationToken = data.token || data.conversation_token;
-    if (conversationToken) return NextResponse.json({ conversationToken });
-  }
-
   const signedUrl = `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(agentId)}`;
   const signedRes = await fetch(signedUrl, { headers, cache: "no-store" });
   if (!signedRes.ok) {
+    console.error("[api/conversation] signed-url failed:", signedRes.status, await signedRes.text());
     return NextResponse.json(
       { error: "ElevenLabs refused a conversation token. Check the API key scopes and agent id." },
       { status: 502 },

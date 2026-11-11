@@ -18,12 +18,14 @@ export async function POST(request: Request) {
   }
 
   const action = body.action;
+  console.log("[api/browser]", { action, sessionId: body.sessionId, query: body.query });
   if (action === "start") {
     try {
       const session = await startLiveSession(body.sessionId);
       return NextResponse.json(session);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not start Browserbase.";
+      console.error("[api/browser] start 502:", error);
       return NextResponse.json({ error: message }, { status: 502 });
     }
   }

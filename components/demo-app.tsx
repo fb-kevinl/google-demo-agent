@@ -3,6 +3,7 @@
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { createAgentSpeech, unlockDemoAudio } from "@/lib/agent-speech";
 import {
   DemoLayout,
   EmailGate,
@@ -13,23 +14,42 @@ import {
   type Line,
 } from "./demo-screens";
 
-const CAP_SECS = 720;
+const CAP_SECS = 180; // ponytail: 3-min cap while on free Browserbase tier; bump to 600+ with api_timeout in lib/browser.ts for full 10-min demos
 type Phase = "prep" | "demo" | "end";
+
+function googleQuery(text: string) {
+  return text
+    .replace(/^(hey[,.]?\s+|please\s+|can you\s+|could you\s+)*/i, "")
+    .replace(/^(search(\s+google)?(\s+for)?\s+|google(\s+for)?\s+|look up\s+|find\s+)/i, "")
+    .replace(/[.?!]+$/, "")
+    .trim();
+}
 
 export function DemoApp() {
   const [email, setEmail] = useState<string | null>(null);
-  if (!email) return <EmailGate onContinue={setEmail} />;
+  if (!email) {
+    return (
+      <EmailGate
+        onContinue={(value) => {
+          unlockDemoAudio();
+          setEmail(value);
+        }}
+      />
+    );
+  }
   return <DemoSession email={email} onStartOver={() => setEmail(null)} />;
 }
 
 function DemoSession({ email, onStartOver }: { email: string; onStartOver: () => void }) {
   const sessionRef = useRef<string | null>(null);
-  const [mockQuery, setMockQuery] = useState("");
   const [searches, setSearches] = useState<string[]>([]);
+  const lastQuery = useRef("");
   const searchGoogle = useCallback(async (parameters: Record<string, unknown>) => {
-    const query = String(parameters.query ?? "");
-    setMockQuery(query);
-    if (query) setSearches((prev) => [...prev, query]);
+    const query = String(parameters.query ?? "").trim();
+    if (!query) return "Empty query. Ask the visitor what to search.";
+    if (query === lastQuery.current) return `Already showing results for “${query}”.`;
+    lastQuery.current = query;
+    setSearches((prev) => [...prev, query]);
     const res = await fetch("/api/browser", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -44,8 +64,8 @@ function DemoSession({ email, onStartOver }: { email: string; onStartOver: () =>
       <SessionShell
         email={email}
         sessionRef={sessionRef}
-        mockQuery={mockQuery}
         searches={searches}
+        searchGoogle={searchGoogle}
         onStartOver={onStartOver}
       />
     </ConversationProvider>
@@ -55,21 +75,24 @@ function DemoSession({ email, onStartOver }: { email: string; onStartOver: () =>
 function SessionShell({
   email,
   sessionRef,
-  mockQuery,
   searches,
+  searchGoogle,
   onStartOver,
 }: {
   email: string;
   sessionRef: { current: string | null };
-  mockQuery: string;
   searches: string[];
+  searchGoogle: (parameters: Record<string, unknown>) => Promise<string>;
   onStartOver: () => void;
 }) {
+  const speakReplyRef = useRef<(text: string) => void>(() => {});
   const conversation = useConversation({
     onMessage: (payload) => {
       const text = payload.message?.trim();
-      if (!text) return;
-      setLines((prev) => [...prev, { role: payload.role, text }]);
+      if (!text || payload.role === "user") return;
+      setAwaiting(false);
+      setLines((prev) => [...prev, { role: "agent", text }]);
+      speakReplyRef.current(text);
     },
     onError: (message) => setVoiceError(message),
   });
@@ -87,11 +110,14 @@ function SessionShell({
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [draft, setDraft] = useState("");
-  const [textOnly, setTextOnly] = useState(false);
   const [secs, setSecs] = useState(CAP_SECS);
   const [warn, setWarn] = useState(false);
   const [hadVoice, setHadVoice] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [awaiting, setAwaiting] = useState(false);
   const txRef = useRef<HTMLDivElement>(null);
+  const speechRef = useRef(createAgentSpeech(setSpeaking));
   const connected = conversation.status === "connected";
   const lost =
     Boolean(browserError) ||
@@ -112,31 +138,33 @@ function SessionShell({
     });
   }, [sessionRef]);
 
+  speakReplyRef.current = (text: string) => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) throw new Error("Speech failed.");
+        speechRef.current.speak(await res.blob());
+      } catch {
+        setVoiceError("The guide can chat, but speech did not play.");
+      }
+    })();
+  };
+
   const connectVoice = useCallback(async () => {
     const conv = conversationRef.current;
     setVoiceError(null);
-    let micOk = false;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
-      micOk = true;
-    } catch {
-      micOk = false;
-    }
-    setTextOnly(!micOk);
     const res = await fetch("/api/conversation");
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Could not start the agent.");
-    if (data.conversationToken) {
-      conv.startSession({ conversationToken: data.conversationToken, textOnly: !micOk });
-    } else {
-      conv.startSession({
-        signedUrl: data.signedUrl,
-        connectionType: data.connectionType ?? "websocket",
-        textOnly: !micOk,
-      });
-    }
-    if (!micOk) setVoiceError("Microphone is blocked. The guide can chat but not speak.");
+    conv.startSession({
+      signedUrl: data.signedUrl,
+      connectionType: "websocket",
+      textOnly: true,
+    });
   }, []);
 
   useEffect(() => {
@@ -145,11 +173,13 @@ function SessionShell({
     setBrowserError(null);
     setLines([]);
     setHadVoice(false);
+    setMuted(false);
     setPrepIndex(0);
     setPrepReady(false);
     setPrepSlow(false);
     setPrepTick(0);
     setPhase("prep");
+    speechRef.current = createAgentSpeech(setSpeaking);
     void (async () => {
       const res = await fetch("/api/browser", {
         method: "POST",
@@ -174,7 +204,6 @@ function SessionShell({
         setBrowser({
           sessionId: data.sessionId,
           liveViewUrl: data.liveViewUrl,
-          mocked: data.mocked,
           message: data.message,
         });
       }
@@ -187,6 +216,7 @@ function SessionShell({
     })();
     return () => {
       cancelled = true;
+      speechRef.current.stop();
       stopBrowser();
       const conv = conversationRef.current;
       if (conv.status === "connected") conv.endSession();
@@ -221,11 +251,12 @@ function SessionShell({
     setEndedByCap(false);
     const id = window.setInterval(() => {
       setSecs((prev) => {
-        if (prev === 121) setWarn(true);
+        if (prev === 61) setWarn(true);
         if (prev <= 1) {
           setEndedByCap(true);
           setPhase("end");
           conversationRef.current.endSession();
+          speechRef.current.stop();
           stopBrowser();
           return 0;
         }
@@ -242,21 +273,26 @@ function SessionShell({
   function sendText(text = draft) {
     const value = text.trim();
     if (!value || !connected) return;
+    setAwaiting(true);
+    setLines((prev) => [...prev, { role: "user", text: value }]);
     conversation.sendUserMessage(value);
     setDraft("");
+    const query = googleQuery(value);
+    if (query) void searchGoogle({ query });
   }
 
   function endDemo(cap = false) {
     setEndedByCap(cap);
     setPhase("end");
     conversation.endSession();
+    speechRef.current.stop();
     stopBrowser();
   }
 
   function toggleMute() {
-    const next = !conversation.isMuted;
-    conversation.setMuted(next);
-    conversation.setVolume({ volume: next ? 0 : 1 });
+    const next = !muted;
+    setMuted(next);
+    speechRef.current.setMuted(next);
   }
 
   if (phase === "prep") {
@@ -282,13 +318,7 @@ function SessionShell({
     );
   }
 
-  const agentLabel = conversation.isMuted
-    ? "Muted"
-    : conversation.isSpeaking
-      ? "Speaking"
-      : connected
-        ? "Listening"
-        : "Connecting";
+  const agentLabel = muted ? "Muted" : speaking ? "Speaking" : connected ? "Listening" : "Connecting";
 
   return (
     <DemoLayout
@@ -297,14 +327,13 @@ function SessionShell({
       lost={lost}
       browser={browser}
       browserError={browserError}
-      mockQuery={mockQuery}
       searches={searches}
       lines={lines}
       draft={draft}
       connected={connected}
-      isSpeaking={conversation.isSpeaking}
-      isMuted={conversation.isMuted}
-      textOnly={textOnly}
+      isSpeaking={speaking}
+      isMuted={muted}
+      awaiting={awaiting}
       agentLabel={agentLabel}
       voiceError={voiceError}
       txRef={txRef}
