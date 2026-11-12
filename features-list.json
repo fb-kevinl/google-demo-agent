@@ -11,5 +11,78 @@
       "If any step fails during setup, show the error right away with a 'Try again' button"
     ],
     "passes": true
+  },
+  {
+    "id": "agent-introduces-itself-and-learns-visitor-name",
+    "category": "agent",
+    "description": "The agent introduces itself as Alex, asks for the visitor's name, and uses it in conversation",
+    "steps": [
+      "Introduce the agent as Alex in the opening greeting and ask for the visitor's name",
+      "Use the visitor's name naturally throughout the conversation once they share it",
+      "If the visitor asks to search before giving their name, run the search first and ask for their name when sharing the results"
+    ],
+    "passes": true
+  },
+  {
+    "id": "sales-leader-demo-persona",
+    "category": "agent",
+    "description": "The agent actively leads and sells the Google Search experience instead of acting like a passive search bar",
+    "steps": [
+      "Guide the conversation and pitch why live Google Search is fast, clear, and effortless",
+      "After each search, highlight the top one or two visible results and suggest a smart follow-up search to try next",
+      "Keep all claims strictly about Google Search and what is visible on screen without inventing Fastbreak product details or clicking into result links"
+    ],
+    "passes": true
+  },
+  {
+    "id": "explain-while-playwright-runs",
+    "category": "agent",
+    "description": "The agent speaks an explanation while Playwright is typing and loading Google Search results",
+    "steps": [
+      "Before calling the searchGoogle tool, speak two sentences explaining what query is being typed and what the visitor should watch for on the live screen",
+      "Play that explanation audio while Playwright runs in the background so there is no awkward silence"
+    ],
+    "passes": true
+  },
+  {
+    "id": "search-loading-state-and-no-interruptions",
+    "category": "ux",
+    "description": "Show a clear loading state and prevent the user from interrupting while Playwright is running a search",
+    "steps": [
+      "Set the searchGoogle tool to disable user interruptions while the search and follow-up turn are running",
+      "Change the agent status badge to 'Searching' and show a spinner with the active search query in both the browser bar and the chat window",
+      "Disable the chat input and Send button with a 'Browser search in progress' notice until the search finishes"
+    ],
+    "passes": true
+  },
+  {
+    "id": "one-minute-remaining-checkin",
+    "category": "agent",
+    "description": "The agent proactively talks to the visitor when 1 minute is left on the demo timer",
+    "steps": [
+      "When the timer reaches 1:00 left, trigger the agent to speak without adding a visible user message bubble in the chat",
+      "Wait until any active search or agent reply finishes before triggering the 1-minute check-in",
+      "Have the agent mention that one minute is left, briefly recap what was searched, and offer one final search or question"
+    ],
+    "passes": true
+  },
+  {
+    "id": "starter-prompt-chips",
+    "category": "ux",
+    "description": "Show clickable starter prompts before the first search so visitors know what to try",
+    "steps": [
+      "Render clickable starter prompt buttons under the opening greeting when no searches have been run yet",
+      "Send the selected prompt immediately when clicked and hide the chips once a search starts"
+    ],
+    "passes": true
+  },
+  {
+    "id": "user-typing-activity-signal",
+    "category": "ux",
+    "description": "Tell the ElevenLabs agent when the visitor is typing so it waits instead of talking over them",
+    "steps": [
+      "Call sendUserActivity on the active ElevenLabs session whenever the visitor types into the chat input"
+    ],
+    "passes": true
   }
 ]

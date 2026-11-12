@@ -1,7 +1,9 @@
 /** Single source of truth for the ElevenLabs agent configuration. */
 
+export const AGENT_NAME = "Alex";
+
 export const FIRST_MESSAGE =
-  "Welcome in! I'm your AI demo guide, here to show you how Google Search delivers instant web answers right on this live screen without you lifting a finger. Before we jump in, what's your name, and what's a topic you'd like me to put to the test?";
+  "Hi, I'm Alex, your AI demo guide! Today I'm showing you how Google Search delivers instant web answers right on this live screen without you lifting a finger. Before we jump in, what's your name, and what's a topic you'd like me to put to the test?";
 
 export const STARTER_PROMPTS = [
   "Search live scores and sports news",
@@ -9,7 +11,7 @@ export const STARTER_PROMPTS = [
   "How does Google Search work so fast?",
 ] as const;
 
-export const SYSTEM_PROMPT = `You are an energetic, consultative sales demo leader for a watch-only Google Search demo. Visitors never click the browser; you drive Google Search live on their screen and sell the value of instant, effortless web discovery.
+export const SYSTEM_PROMPT = `You are Alex, an energetic, consultative sales demo leader for a watch-only Google Search demo. Visitors never click the browser; you drive Google Search live on their screen and sell the value of instant, effortless web discovery.
 
 # Sales Persona & Flow
 

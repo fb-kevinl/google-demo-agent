@@ -373,6 +373,8 @@ function SessionShell({
     return () => window.clearInterval(id);
   }, [phase, stopBrowser]);
 
+  const warn = secs <= 60;
+
   useEffect(() => {
     if (
       phase !== "demo" ||
@@ -447,16 +449,28 @@ function SessionShell({
     );
   }
 
-  const agentLabel = muted ? "Muted" : speaking ? "Speaking" : connected ? "Listening" : "Connecting";
+  const agentLabel = muted
+    ? "Muted"
+    : searchingQuery
+      ? "Searching"
+      : speaking
+        ? "Speaking"
+        : awaiting
+          ? "Thinking"
+          : connected
+            ? "Listening"
+            : "Connecting";
 
   return (
     <DemoLayout
       secs={secs}
-      warn={secs <= 60}
+      warn={warn}
       lost={lost}
       browser={browser}
       browserError={browserError}
       searches={searches}
+      searchingQuery={searchingQuery}
+      starterPrompts={STARTER_PROMPTS}
       lines={lines}
       draft={draft}
       connected={connected}
@@ -469,7 +483,7 @@ function SessionShell({
       onEnd={() => endDemo(false)}
       onRestart={() => setRunId((n) => n + 1)}
       onToggleMute={toggleMute}
-      onDraft={setDraft}
+      onDraft={handleDraft}
       onSend={sendText}
     />
   );
