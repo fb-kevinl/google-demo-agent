@@ -11,38 +11,29 @@ export GITHUB_TOKEN=ghp_...   # read:packages for @fastbreak-amateur/fb-toolkit
 pnpm install
 cp .env.example .env.local
 # fill ELEVENLABS_API_KEY, BROWSERBASE_API_KEY, ELEVENLABS_AGENT_ID
+pnpm agent:push
 pnpm dev
 ```
 
 Open [http://localhost:4317](http://localhost:4317). Click **Take our AI demo**, enter any email (it is discarded), and ask the AI agent to search.
 
-## ElevenLabs agent
+## ElevenLabs agent (`pnpm agent:push` / `pnpm agent:pull`)
 
-Create an agent in ElevenLabs. Paste from `lib/agent-config.ts`:
+All ElevenLabs agent configuration lives in `lib/agent-config.ts` and `kb/google-search.md`:
 
-- **First message:** `FIRST_MESSAGE`
-- **System prompt:** `SYSTEM_PROMPT`
-- **Client tool:** `searchGoogle` with a `query` string, `expects_response: true`, `pre_tool_speech: force`, `execution_mode: post_tool_speech`, `interruption_mode: allow`
-- **Knowledge base:** upload `kb/google-search.md` in prompt (full-context) mode, not RAG
-- Enable system `skip_turn`
+- **Push local config to ElevenLabs:** `pnpm agent:push`
+  - Syncs `SYSTEM_PROMPT`, the `searchGoogle` client tool (`expects_response: true`, `response_timeout_secs: 30`, `pre_tool_speech: "force"`, `execution_mode: "immediate"`, `interruption_mode: "allow"`), built-in `skip_turn`, and uploads/attaches `kb/google-search.md` (`usage_mode: "prompt"`).
+  - Leaves `first_message: ""` on the ElevenLabs server because `FIRST_MESSAGE` is injected locally by the client when the demo opens.
+- **Inspect / pull remote config from ElevenLabs:** `pnpm agent:pull`
 
-Set `ELEVENLABS_AGENT_ID` to that agent. Restricted API key: ElevenAgents Read+Write, Voices Read, TTS Access, STT Access.
+Restricted API key scopes required: ElevenAgents Read+Write, Voices Read, TTS Access, STT Access.
 
 ## Env
 
 | Name | Role |
 | --- | --- |
-| `ELEVENLABS_API_KEY` | Secret. Conversation token and TTS. |
+| `ELEVENLABS_API_KEY` | Secret. Conversation token, TTS, and `pnpm agent:push` / `pnpm agent:pull`. |
 | `BROWSERBASE_API_KEY` | Secret. Cloud browser. The key selects the Browserbase project. |
-| `ELEVENLABS_AGENT_ID` | Dashboard id. Create an agent in ElevenLabs, then paste its id. |
+| `ELEVENLABS_AGENT_ID` | Dashboard id (`agent_...`). |
 
 Email is not persisted.
-
-
-## Flaws (known)
-
-- `pnpm install` needs `GITHUB_TOKEN` for GitHub Packages (`@fastbreak-amateur/fb-toolkit`).
-- Agent id is not a Cursor app secret; published voice stays idle until `ELEVENLABS_AGENT_ID` is in the host env. Missing `BROWSERBASE_API_KEY` uses a sample iframe.
-- Playwright `connectOverCDP` from a serverless host can time out; search then fails and the agent should park.
-- In-memory session close is best-effort. New demo start requests Browserbase `REQUEST_RELEASE` on the previous id from the client.
-- Google consent walls can block typing until a human updates selectors.

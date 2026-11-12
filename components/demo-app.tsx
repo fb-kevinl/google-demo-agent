@@ -19,14 +19,6 @@ import {
 const CAP_SECS = 180; // ponytail: 3-min cap while on free Browserbase tier; bump to 600+ with api_timeout in lib/browser.ts for full 10-min demos
 type Phase = "prep" | "demo" | "end";
 
-function googleQuery(text: string) {
-  return text
-    .replace(/^(hey[,.]?\s+|please\s+|can you\s+|could you\s+)*/i, "")
-    .replace(/^(search(\s+google)?(\s+for)?\s+|google(\s+for)?\s+|look up\s+|find\s+)/i, "")
-    .replace(/[.?!]+$/, "")
-    .trim();
-}
-
 export function DemoApp() {
   const [started, setStarted] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
@@ -61,20 +53,25 @@ export function DemoApp() {
 function DemoSession({ email, onStartOver }: { email: string; onStartOver: () => void }) {
   const sessionRef = useRef<string | null>(null);
   const [searches, setSearches] = useState<string[]>([]);
-  const lastQuery = useRef("");
+  const lastSearchRef = useRef<{ query: string; promise: Promise<string> } | null>(null);
   const searchGoogle = useCallback(async (parameters: Record<string, unknown>) => {
     const query = String(parameters.query ?? "").trim();
     if (!query) return "Empty query. Ask the visitor what to search.";
-    if (query === lastQuery.current) return `Already showing results for “${query}”.`;
-    lastQuery.current = query;
+    if (lastSearchRef.current?.query.toLowerCase() === query.toLowerCase()) {
+      return lastSearchRef.current.promise;
+    }
     setSearches((prev) => [...prev, query]);
-    const res = await fetch("/api/browser", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "search", query, sessionId: sessionRef.current }),
-    });
-    const data = (await res.json()) as { narration?: string };
-    return data.narration || "Search returned nothing visible. Park it.";
+    const promise = (async () => {
+      const res = await fetch("/api/browser", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "search", query, sessionId: sessionRef.current }),
+      });
+      const data = (await res.json()) as { narration?: string };
+      return data.narration || "Search returned nothing visible. Park it.";
+    })();
+    lastSearchRef.current = { query, promise };
+    return promise;
   }, []);
 
   return (
@@ -83,7 +80,6 @@ function DemoSession({ email, onStartOver }: { email: string; onStartOver: () =>
         email={email}
         sessionRef={sessionRef}
         searches={searches}
-        searchGoogle={searchGoogle}
         onStartOver={onStartOver}
       />
     </ConversationProvider>
@@ -94,13 +90,11 @@ function SessionShell({
   email,
   sessionRef,
   searches,
-  searchGoogle,
   onStartOver,
 }: {
   email: string;
   sessionRef: { current: string | null };
   searches: string[];
-  searchGoogle: (parameters: Record<string, unknown>) => Promise<string>;
   onStartOver: () => void;
 }) {
   const speakReplyRef = useRef<(text: string) => void>(() => {});
@@ -156,6 +150,7 @@ function SessionShell({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "stop", sessionId: id }),
+      keepalive: true,
     });
   }, [sessionRef]);
 
@@ -215,6 +210,7 @@ function SessionShell({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "stop", sessionId: data.sessionId }),
+            keepalive: true,
           });
         }
         return;
@@ -306,8 +302,6 @@ function SessionShell({
     setLines((prev) => [...prev, { role: "user", text: value }]);
     conversation.sendUserMessage(value);
     setDraft("");
-    const query = googleQuery(value);
-    if (query) void searchGoogle({ query });
   }
 
   function endDemo(cap = false) {

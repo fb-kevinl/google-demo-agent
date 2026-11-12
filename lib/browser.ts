@@ -17,6 +17,7 @@ type ActiveSession = {
   browser: Browser;
   page: Page;
   connectUrl: string;
+  lock: Promise<unknown>;
 };
 
 function apiKey() {
@@ -113,11 +114,11 @@ export async function startLiveSession(previousId?: string | null): Promise<Live
 
   try {
     log("connecting CDP", { id: session.id });
-    const page = await openPage(session.id, session.connectUrl);
+    const active = await openSession(session.id, session.connectUrl);
     log("goto google.com", { id: session.id });
-    await page.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 25000 });
-    await dismissConsent(page);
-    await injectCursor(page);
+    await active.page.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 25000 });
+    await dismissConsent(active.page);
+    await injectCursor(active.page);
   } catch (error) {
     logErr(`setup (${session.id})`, error);
     await releaseSession(session.id);
@@ -145,41 +146,13 @@ export async function searchGoogle(sessionId: string | null, query: string): Pro
   }
 
   try {
-    const page = await openPage(sessionId);
-    log("search typing", { sessionId, url: page.url(), query: q });
-    await dismissConsent(page);
-    await injectCursor(page);
-    const box = page.locator('textarea[name="q"], input[name="q"]').first();
-    await box.waitFor({ state: "visible", timeout: 12000 });
-    await box.click();
-    await box.fill("");
-    await highlight(page, box);
-    await box.pressSequentially(q, { delay: 35 });
-    await box.press("Enter");
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(1200);
-    const titles = (await page.locator("#search h3").allTextContents()).filter(Boolean).slice(0, 5);
-    const snippets = (await page.locator("#search .VwiC3b").allTextContents())
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 5);
-    log("search results", { sessionId, url: page.url(), titleCount: titles.length, titles });
-    if (!titles.length) {
-      return {
-        ok: false,
-        query: q,
-        narration: "Search ran but no result titles were visible. Park this and keep going.",
-      };
-    }
-    const lines = titles.map((t, i) => {
-      const snip = snippets[i] ? ` - ${snippets[i].slice(0, 140)}` : "";
-      return `${i + 1}) ${t}${snip}`;
-    });
-    return {
-      ok: true,
-      query: q,
-      narration: `On-screen results for “${q}”: ${lines.join(" ")}`,
-    };
+    const active = await openSession(sessionId);
+    const run = active.lock.then(
+      () => executeSearch(sessionId, active.page, q),
+      () => executeSearch(sessionId, active.page, q),
+    );
+    active.lock = run.catch(() => undefined);
+    return await run;
   } catch (error) {
     logErr(`search (${sessionId})`, error);
     const message = error instanceof Error ? error.message : "Search failed.";
@@ -191,24 +164,89 @@ export async function searchGoogle(sessionId: string | null, query: string): Pro
   }
 }
 
+async function executeSearch(sessionId: string, page: Page, q: string): Promise<SearchResult> {
+  log("search typing", { sessionId, url: page.url(), query: q });
+  await dismissConsent(page);
+  await injectCursor(page);
+  const box = page.locator('textarea[name="q"], input[name="q"]').first();
+  await box.waitFor({ state: "visible", timeout: 12000 });
+  await box.click();
+  await box.fill("");
+  await highlight(page, box);
+  await box.pressSequentially(q, { delay: 35 });
+
+  const prevUrl = page.url();
+  await Promise.all([
+    page.waitForURL((url) => url.toString() !== prevUrl, { timeout: 10000 }).catch(() => undefined),
+    box.press("Enter"),
+  ]);
+  await page
+    .locator("#search h3, #rso h3")
+    .first()
+    .waitFor({ state: "visible", timeout: 10000 })
+    .catch(() => undefined);
+  await page.waitForTimeout(500);
+
+  const items = await page.evaluate(() => {
+    const results: { title: string; snippet: string }[] = [];
+    const seen = new Set<string>();
+    const headings = document.querySelectorAll("#search h3, #rso h3");
+    for (const h3 of headings) {
+      const title = h3.textContent?.trim() || "";
+      if (!title || seen.has(title)) continue;
+      seen.add(title);
+      const container = h3.closest(".MjjYud, .g, [data-hveid]") || h3.parentElement?.parentElement;
+      const snipEl = container?.querySelector(".VwiC3b, [data-sncf]");
+      const snippet = snipEl?.textContent?.trim() || "";
+      results.push({ title, snippet });
+      if (results.length >= 5) break;
+    }
+    return results;
+  });
+
+  log("search results", {
+    sessionId,
+    url: page.url(),
+    titleCount: items.length,
+    titles: items.map((r) => r.title),
+  });
+  if (!items.length) {
+    return {
+      ok: false,
+      query: q,
+      narration: "Search ran but no result titles were visible. Park this and keep going.",
+    };
+  }
+  const lines = items.map((item, i) => {
+    const snip = item.snippet ? ` - ${item.snippet.slice(0, 140)}` : "";
+    return `${i + 1}) ${item.title}${snip}`;
+  });
+  return {
+    ok: true,
+    query: q,
+    narration: `On-screen results for "${q}": ${lines.join(" ")}`,
+  };
+}
+
 function appendNavbarFalse(url: string) {
   const u = new URL(url);
   u.searchParams.set("navbar", "false");
   return u.toString();
 }
 
-async function openPage(sessionId: string, url?: string): Promise<Page> {
+async function openSession(sessionId: string, url?: string): Promise<ActiveSession> {
   const store = liveStore();
   const existing = store.pages.get(sessionId);
   if (existing && existing.browser.isConnected() && !existing.page.isClosed()) {
-    return existing.page;
+    return existing;
   }
   const ws = url || existing?.connectUrl || connectUrl(sessionId);
   const browser = await chromium.connectOverCDP(ws);
   const context = browser.contexts()[0] ?? (await browser.newContext());
   const page = context.pages()[0] ?? (await context.newPage());
-  store.pages.set(sessionId, { browser, page, connectUrl: ws });
-  return page;
+  const active: ActiveSession = { browser, page, connectUrl: ws, lock: Promise.resolve() };
+  store.pages.set(sessionId, active);
+  return active;
 }
 
 async function dismissConsent(page: Page) {

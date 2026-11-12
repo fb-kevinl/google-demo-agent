@@ -7,7 +7,9 @@
     "dev": "next dev --port 4317",
     "build": "next build",
     "start": "next start --port 4317",
-    "lint": "eslint"
+    "lint": "eslint",
+    "agent:push": "node --env-file=.env.local scripts/sync-agent.mjs push",
+    "agent:pull": "node --env-file=.env.local scripts/sync-agent.mjs pull"
   },
   "dependencies": {
     "@fastbreak-amateur/fb-toolkit": "5.17.0",
@@ -33,7 +35,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5"
   }
 }
