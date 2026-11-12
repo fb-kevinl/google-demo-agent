@@ -126,7 +126,6 @@ function SessionShell({
   const [lines, setLines] = useState<Line[]>([]);
   const [draft, setDraft] = useState("");
   const [secs, setSecs] = useState(CAP_SECS);
-  const [warn, setWarn] = useState(false);
   const [hadVoice, setHadVoice] = useState(false);
   const [muted, setMuted] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -272,21 +271,19 @@ function SessionShell({
   useEffect(() => {
     if (phase !== "demo") return;
     setSecs(CAP_SECS);
-    setWarn(false);
     setEndedByCap(false);
+    const endAt = Date.now() + CAP_SECS * 1000;
     const id = window.setInterval(() => {
-      setSecs((prev) => {
-        if (prev === 61) setWarn(true);
-        if (prev <= 1) {
-          setEndedByCap(true);
-          setPhase("end");
-          conversationRef.current.endSession();
-          speechRef.current.stop();
-          stopBrowser();
-          return 0;
-        }
-        return prev - 1;
-      });
+      const rem = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+      setSecs(rem);
+      if (rem === 0) {
+        window.clearInterval(id);
+        setEndedByCap(true);
+        setPhase("end");
+        conversationRef.current.endSession();
+        speechRef.current.stop();
+        stopBrowser();
+      }
     }, 1000);
     return () => window.clearInterval(id);
   }, [phase, stopBrowser]);
@@ -344,7 +341,7 @@ function SessionShell({
   return (
     <DemoLayout
       secs={secs}
-      warn={warn}
+      warn={secs <= 60}
       lost={lost}
       browser={browser}
       browserError={browserError}
