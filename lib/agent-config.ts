@@ -48,7 +48,14 @@ export const AGENT_CONFIG = {
   systemPrompt: SYSTEM_PROMPT,
   searchTool: SEARCH_TOOL,
   builtInTools: {
-    skip_turn: {},
+    skip_turn: {
+      type: "system",
+      name: "skip_turn",
+      description: "",
+      params: {
+        system_tool_type: "skip_turn",
+      },
+    },
   },
   kbPath: "kb/google-search.md",
   kbName: "kb/google-search.md",

@@ -131,7 +131,14 @@ async function push() {
           tools: [...otherTools, searchTool],
           built_in_tools: {
             ...(currentPrompt.built_in_tools ?? {}),
-            skip_turn: currentPrompt.built_in_tools?.skip_turn ?? {},
+            skip_turn: currentPrompt.built_in_tools?.skip_turn ?? {
+              type: "system",
+              name: "skip_turn",
+              description: "",
+              params: {
+                system_tool_type: "skip_turn",
+              },
+            },
           },
           knowledge_base: knowledgeBase,
         },

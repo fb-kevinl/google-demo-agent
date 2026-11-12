@@ -267,16 +267,16 @@ async function injectCursor(page: Page) {
     const el = document.createElement("div");
     el.id = "fb-demo-cursor";
     el.style.cssText =
-      "position:fixed;z-index:2147483647;width:18px;height:18px;border:2px solid #f97316;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 0 0 6px rgba(249,115,22,.22);transition:left .08s linear,top .08s linear;";
+      "position:fixed;z-index:2147483647;top:0;left:0;width:20px;height:20px;pointer-events:none;transition:left .08s linear,top .08s linear;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));";
+    el.innerHTML =
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 2L3 19L7.8 14.4L11.2 21.5L13.9 20.2L10.5 13.1L17 13.1L3 2Z" fill="#111827" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
     document.documentElement.appendChild(el);
-    document.addEventListener(
-      "mousemove",
-      (e) => {
-        el.style.left = `${e.clientX}px`;
-        el.style.top = `${e.clientY}px`;
-      },
-      true,
-    );
+    const move = (e: MouseEvent) => {
+      el.style.left = `${e.clientX}px`;
+      el.style.top = `${e.clientY}px`;
+    };
+    document.addEventListener("mousemove", move, true);
+    document.addEventListener("mousedown", move, true);
   });
 }
 
