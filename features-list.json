@@ -1,0 +1,15 @@
+[
+  {
+    "id": "prep-real-step-streaming",
+    "category": "loading",
+    "description": "The setup screen shows real loading progress for each step instead of using a fake timer",
+    "steps": [
+      "Start the AI agent and the cloud browser at the same time so the user doesn't wait twice",
+      "List 'Connecting the AI agent' first since it finishes fastest, followed by 'Allocating cloud browser', 'Opening google.com', and 'Starting the live view' so steps check off from top to bottom",
+      "Check off each browser step only as the backend actually finishes it (session created, Google loaded, live view ready)",
+      "Only open the demo screen once all four steps are actually finished",
+      "If any step fails during setup, show the error right away with a 'Try again' button"
+    ],
+    "passes": true
+  }
+]

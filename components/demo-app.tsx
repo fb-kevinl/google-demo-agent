@@ -3,21 +3,29 @@
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { FIRST_MESSAGE } from "@/lib/agent-config";
+import { FIRST_MESSAGE, STARTER_PROMPTS } from "@/lib/agent-config";
 import { createAgentSpeech, unlockDemoAudio } from "@/lib/agent-speech";
 import {
   DashboardScreen,
   DemoLayout,
   EmailGate,
   EndScreen,
-  PREP_STEPS,
   PrepScreen,
   type BrowserState,
   type Line,
+  type PrepStepKey,
+  type PrepStepStatus,
 } from "./demo-screens";
 
 const CAP_SECS = 180; // ponytail: 3-min cap while on free Browserbase tier; bump to 600+ with api_timeout in lib/browser.ts for full 10-min demos
 type Phase = "prep" | "demo" | "end";
+
+const INITIAL_STEPS: Record<PrepStepKey, PrepStepStatus> = {
+  session: "running",
+  google: "pending",
+  live: "pending",
+  agent: "running",
+};
 
 export function DemoApp() {
   const [started, setStarted] = useState(false);
@@ -53,7 +61,13 @@ export function DemoApp() {
 function DemoSession({ email, onStartOver }: { email: string; onStartOver: () => void }) {
   const sessionRef = useRef<string | null>(null);
   const [searches, setSearches] = useState<string[]>([]);
+  const [searchingQuery, setSearchingQuery] = useState<string | null>(null);
   const lastSearchRef = useRef<{ query: string; promise: Promise<string> } | null>(null);
+  const resetSearchState = useCallback(() => {
+    setSearches([]);
+    setSearchingQuery(null);
+    lastSearchRef.current = null;
+  }, []);
   const searchGoogle = useCallback(async (parameters: Record<string, unknown>) => {
     const query = String(parameters.query ?? "").trim();
     if (!query) return "Empty query. Ask the visitor what to search.";
@@ -61,14 +75,19 @@ function DemoSession({ email, onStartOver }: { email: string; onStartOver: () =>
       return lastSearchRef.current.promise;
     }
     setSearches((prev) => [...prev, query]);
+    setSearchingQuery(query);
     const promise = (async () => {
-      const res = await fetch("/api/browser", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "search", query, sessionId: sessionRef.current }),
-      });
-      const data = (await res.json()) as { narration?: string };
-      return data.narration || "Search returned nothing visible. Park it.";
+      try {
+        const res = await fetch("/api/browser", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "search", query, sessionId: sessionRef.current }),
+        });
+        const data = (await res.json()) as { narration?: string };
+        return data.narration || "Search returned nothing visible. Park it.";
+      } finally {
+        setSearchingQuery(null);
+      }
     })();
     lastSearchRef.current = { query, promise };
     return promise;
@@ -80,6 +99,8 @@ function DemoSession({ email, onStartOver }: { email: string; onStartOver: () =>
         email={email}
         sessionRef={sessionRef}
         searches={searches}
+        searchingQuery={searchingQuery}
+        onResetSearch={resetSearchState}
         onStartOver={onStartOver}
       />
     </ConversationProvider>
@@ -90,15 +111,20 @@ function SessionShell({
   email,
   sessionRef,
   searches,
+  searchingQuery,
+  onResetSearch,
   onStartOver,
 }: {
   email: string;
   sessionRef: { current: string | null };
   searches: string[];
+  searchingQuery: string | null;
+  onResetSearch: () => void;
   onStartOver: () => void;
 }) {
   const speakReplyRef = useRef<(text: string) => void>(() => {});
   const greetedRef = useRef(false);
+  const warnPromptedRef = useRef(false);
   const conversation = useConversation({
     onMessage: (payload) => {
       const text = payload.message?.trim();
@@ -115,8 +141,7 @@ function SessionShell({
   conversationRef.current = conversation;
   const [phase, setPhase] = useState<Phase>("prep");
   const [endedByCap, setEndedByCap] = useState(false);
-  const [prepIndex, setPrepIndex] = useState(0);
-  const [prepReady, setPrepReady] = useState(false);
+  const [stepStatus, setStepStatus] = useState<Record<PrepStepKey, PrepStepStatus>>(INITIAL_STEPS);
   const [prepSlow, setPrepSlow] = useState(false);
   const [prepTick, setPrepTick] = useState(0);
   const [runId, setRunId] = useState(0);
@@ -138,7 +163,10 @@ function SessionShell({
     (phase === "demo" && hadVoice && conversation.status === "disconnected");
 
   useEffect(() => {
-    if (connected) setHadVoice(true);
+    if (connected) {
+      setHadVoice(true);
+      setStepStatus((prev) => (prev.agent === "done" ? prev : { ...prev, agent: "done" }));
+    }
   }, [connected]);
 
   const stopBrowser = useCallback(() => {
@@ -175,7 +203,7 @@ function SessionShell({
     const res = await fetch("/api/conversation");
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Could not start the agent.");
-    conv.startSession({
+    await conv.startSession({
       signedUrl: data.signedUrl,
       connectionType: "websocket",
       textOnly: true,
@@ -187,50 +215,103 @@ function SessionShell({
     setBrowser(null);
     setBrowserError(null);
     setLines([]);
+    onResetSearch();
     greetedRef.current = false;
+    warnPromptedRef.current = false;
     setHadVoice(false);
     setMuted(false);
-    setPrepIndex(0);
-    setPrepReady(false);
+    setStepStatus(INITIAL_STEPS);
     setPrepSlow(false);
     setPrepTick(0);
     setPhase("prep");
     speechRef.current = createAgentSpeech(setSpeaking);
-    void (async () => {
-      const res = await fetch("/api/browser", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start" }),
-      });
-      const data = await res.json();
-      if (cancelled) {
-        if (data.sessionId) {
-          void fetch("/api/browser", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "stop", sessionId: data.sessionId }),
-            keepalive: true,
-          });
-        }
-        return;
-      }
-      if (!res.ok) {
-        setBrowserError(data.error || "Could not start the live view.");
-      } else {
-        sessionRef.current = data.sessionId;
-        setBrowser({
-          sessionId: data.sessionId,
-          liveViewUrl: data.liveViewUrl,
-          message: data.message,
+
+    const startBrowser = async () => {
+      try {
+        const res = await fetch("/api/browser", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "start" }),
         });
+        if (!res.ok || !res.body) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Could not start the live view.");
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const chunks = buffer.split("\n");
+          buffer = chunks.pop() ?? "";
+          for (const line of chunks) {
+            if (!line.trim()) continue;
+            const event = JSON.parse(line) as
+              | { type: "step"; step: "session" | "google" | "live" }
+              | ({ type: "done" } & BrowserState)
+              | { type: "error"; error: string };
+            if (event.type === "step") {
+              if (cancelled) continue;
+              setStepStatus((prev) => {
+                if (event.step === "session") {
+                  return { ...prev, session: "done", google: "running" };
+                }
+                if (event.step === "google") {
+                  return { ...prev, session: "done", google: "done", live: "running" };
+                }
+                return { ...prev, session: "done", google: "done", live: "done" };
+              });
+            } else if (event.type === "done") {
+              if (cancelled) {
+                void fetch("/api/browser", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "stop", sessionId: event.sessionId }),
+                  keepalive: true,
+                });
+                return;
+              }
+              sessionRef.current = event.sessionId;
+              setBrowser({
+                sessionId: event.sessionId,
+                liveViewUrl: event.liveViewUrl,
+                message: event.message,
+              });
+            } else if (event.type === "error") {
+              throw new Error(event.error);
+            }
+          }
+        }
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Could not start the live view.";
+        setBrowserError(message);
+        setStepStatus((prev) => ({
+          ...prev,
+          session: prev.session === "running" ? "error" : prev.session,
+          google: prev.google === "running" ? "error" : prev.google,
+          live: prev.live === "running" ? "error" : prev.live,
+        }));
       }
+    };
+
+    const startAgent = async () => {
       try {
         await connectVoice();
+        if (!cancelled) {
+          setStepStatus((prev) => ({ ...prev, agent: "done" }));
+        }
       } catch (error) {
+        if (cancelled) return;
         setVoiceError(error instanceof Error ? error.message : "Could not reach the agent.");
+        setStepStatus((prev) => ({ ...prev, agent: "error" }));
       }
-      if (!cancelled) setPrepReady(true);
-    })();
+    };
+
+    void Promise.all([startBrowser(), startAgent()]);
+
     return () => {
       cancelled = true;
       speechRef.current.stop();
@@ -238,16 +319,14 @@ function SessionShell({
       const conv = conversationRef.current;
       if (conv.status === "connected") conv.endSession();
     };
-  }, [runId, connectVoice, sessionRef, stopBrowser]);
+  }, [runId, connectVoice, onResetSearch, sessionRef, stopBrowser]);
 
   useEffect(() => {
     if (phase !== "prep") return;
     const started = Date.now();
     const id = window.setInterval(() => {
-      const elapsed = Date.now() - started;
-      setPrepTick(Math.floor(elapsed / 1000));
-      setPrepIndex(Math.min(PREP_STEPS.length - 1, Math.floor(elapsed / 800)));
-    }, 100);
+      setPrepTick(Math.floor((Date.now() - started) / 1000));
+    }, 250);
     return () => window.clearInterval(id);
   }, [phase, runId]);
 
@@ -255,11 +334,17 @@ function SessionShell({
     if (phase === "prep" && prepTick >= 30) setPrepSlow(true);
   }, [phase, prepTick]);
 
+  const allPrepDone =
+    stepStatus.session === "done" &&
+    stepStatus.google === "done" &&
+    stepStatus.live === "done" &&
+    stepStatus.agent === "done";
+
   useEffect(() => {
-    if (phase !== "prep" || !prepReady || prepIndex < PREP_STEPS.length - 1) return;
-    const id = window.setTimeout(() => setPhase("demo"), 400);
+    if (phase !== "prep" || !allPrepDone) return;
+    const id = window.setTimeout(() => setPhase("demo"), 300);
     return () => window.clearTimeout(id);
-  }, [phase, prepReady, prepIndex]);
+  }, [phase, allPrepDone]);
 
   useEffect(() => {
     if (phase !== "demo" || greetedRef.current) return;
@@ -289,16 +374,41 @@ function SessionShell({
   }, [phase, stopBrowser]);
 
   useEffect(() => {
+    if (
+      phase !== "demo" ||
+      !warn ||
+      !connected ||
+      searchingQuery ||
+      awaiting ||
+      warnPromptedRef.current
+    ) {
+      return;
+    }
+    warnPromptedRef.current = true;
+    setAwaiting(true);
+    conversationRef.current.sendUserMessage(
+      "[SYSTEM: 1 minute left in the 3-minute demo. Proactively check in with the visitor (use their name if known), let them know one minute remains, briefly recap what we have searched so far, and invite them to run one final Google search or ask a last question.]",
+    );
+  }, [phase, warn, connected, searchingQuery, awaiting]);
+
+  useEffect(() => {
     txRef.current?.scrollTo({ top: txRef.current.scrollHeight });
-  }, [lines]);
+  }, [lines, searchingQuery, awaiting]);
 
   function sendText(text = draft) {
     const value = text.trim();
-    if (!value || !connected) return;
+    if (!value || !connected || searchingQuery || awaiting) return;
     setAwaiting(true);
     setLines((prev) => [...prev, { role: "user", text: value }]);
     conversation.sendUserMessage(value);
     setDraft("");
+  }
+
+  function handleDraft(value: string) {
+    setDraft(value);
+    if (connected && value.trim()) {
+      conversation.sendUserActivity();
+    }
   }
 
   function endDemo(cap = false) {
@@ -318,9 +428,10 @@ function SessionShell({
   if (phase === "prep") {
     return (
       <PrepScreen
-        prepIndex={prepIndex}
+        stepStatus={stepStatus}
         prepTick={prepTick}
         prepSlow={prepSlow}
+        prepError={browserError || voiceError}
         onRetry={() => setRunId((n) => n + 1)}
       />
     );

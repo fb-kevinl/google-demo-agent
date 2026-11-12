@@ -41,11 +41,14 @@ import {
 } from "@fastbreak-amateur/fb-toolkit/client";
 
 export const PREP_STEPS = [
-  "Saving your email",
-  "Opening google.com",
-  "Starting the live view",
-  "Starting the AI agent",
+  { key: "agent", label: "Connecting the AI agent" },
+  { key: "session", label: "Allocating cloud browser" },
+  { key: "google", label: "Opening google.com" },
+  { key: "live", label: "Starting the live view" },
 ] as const;
+
+export type PrepStepKey = (typeof PREP_STEPS)[number]["key"];
+export type PrepStepStatus = "pending" | "running" | "done" | "error";
 
 const emailSchema = z.object({
   email: z.string().email("Enter an email like name@company.com."),
@@ -349,14 +352,16 @@ export function EmailGate({
 }
 
 export function PrepScreen({
-  prepIndex,
+  stepStatus,
   prepTick,
   prepSlow,
+  prepError,
   onRetry,
 }: {
-  prepIndex: number;
+  stepStatus: Record<PrepStepKey, PrepStepStatus>;
   prepTick: number;
   prepSlow: boolean;
+  prepError?: string | null;
   onRetry: () => void;
 }) {
   return (
@@ -368,25 +373,32 @@ export function PrepScreen({
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
-            {PREP_STEPS.map((label, i) => {
-              const done = i < prepIndex;
-              const run = i === prepIndex;
+            {PREP_STEPS.map(({ key, label }) => {
+              const status = stepStatus[key];
+              const done = status === "done";
+              const run = status === "running";
+              const err = status === "error";
               return (
                 <div
-                  key={label}
-                  className={`flex items-center gap-2.5 py-1.5 text-sm ${run || done ? "" : "text-muted-foreground"}`}
+                  key={key}
+                  className={`flex items-center gap-2.5 py-1.5 text-sm ${
+                    err ? "text-destructive" : run || done ? "" : "text-muted-foreground"
+                  }`}
                 >
                   <span
                     className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${
                       done
                         ? "border-foreground bg-foreground text-background"
-                        : run
-                          ? "border-foreground"
-                          : "border-neutral-300"
+                        : err
+                          ? "border-destructive text-destructive"
+                          : run
+                            ? "border-foreground"
+                            : "border-neutral-300"
                     }`}
                   >
                     {done ? <Check className="size-3" /> : null}
                     {run ? <Spinner className="size-3.5" /> : null}
+                    {err ? <span className="text-xs font-bold leading-none">!</span> : null}
                   </span>
                   {label}
                 </div>
@@ -394,7 +406,16 @@ export function PrepScreen({
             })}
           </div>
           <p className="text-xs text-muted-foreground">{prepTick}s</p>
-          {prepSlow ? (
+          {prepError ? (
+            <Alert variant="error">
+              <AlertBody className="flex items-center justify-between gap-2">
+                <span>{prepError}</span>
+                <Button size="sm" variant="outline" onClick={onRetry}>
+                  Try again
+                </Button>
+              </AlertBody>
+            </Alert>
+          ) : prepSlow ? (
             <Alert variant="warning">
               <AlertBody className="flex items-center justify-between gap-2">
                 <span>Setup is taking longer than normal.</span>
@@ -451,6 +472,8 @@ export function DemoLayout({
   browser,
   browserError,
   searches,
+  searchingQuery,
+  starterPrompts,
   lines,
   draft,
   connected,
@@ -472,6 +495,8 @@ export function DemoLayout({
   browser: BrowserState | null;
   browserError: string | null;
   searches: string[];
+  searchingQuery: string | null;
+  starterPrompts: readonly string[];
   lines: Line[];
   draft: string;
   connected: boolean;
@@ -487,6 +512,8 @@ export function DemoLayout({
   onDraft: (value: string) => void;
   onSend: (text?: string) => void;
 }) {
+  const inputLocked = !connected || Boolean(searchingQuery) || awaiting;
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="flex h-[52px] items-center gap-3.5 border-b bg-background px-4">
@@ -530,9 +557,16 @@ export function DemoLayout({
             <Badge variant={browserError ? "destructive" : browser ? "success" : "secondary"}>
               {browserError ? "Not connected" : browser ? "Live" : "Loading"}
             </Badge>
-            <span className="text-xs text-muted-foreground">
-              View only. The AI agent controls this screen.
-            </span>
+            {searchingQuery ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+                <Spinner className="size-3.5" />
+                Searching Google for &ldquo;{searchingQuery}&rdquo;...
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                View only. The AI agent controls this screen.
+              </span>
+            )}
           </div>
           <div className="relative m-3 flex min-h-[240px] flex-1 items-center justify-center overflow-hidden rounded-lg border bg-muted/30 lg:min-h-0">
             {browserError ? (
@@ -618,13 +652,36 @@ export function DemoLayout({
                 </div>
               ))
             )}
-            {connected && awaiting && lines.at(-1)?.role !== "agent" ? (
+            {searchingQuery ? (
+              <div className="flex items-center gap-2.5 self-start rounded-[10px] border bg-muted/60 px-3 py-2 text-xs text-foreground">
+                <Spinner className="size-3.5 shrink-0" />
+                <span>
+                  Running live Google search for <b>&ldquo;{searchingQuery}&rdquo;</b>...
+                </span>
+              </div>
+            ) : connected && awaiting && lines.at(-1)?.role !== "agent" ? (
               <div className="max-w-[88%] self-start rounded-[10px] bg-muted px-3 py-2">
                 <span className="demo-typing">
                   <span />
                   <span />
                   <span />
                 </span>
+              </div>
+            ) : null}
+            {connected && lines.length > 0 && searches.length === 0 && !searchingQuery && !awaiting ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {starterPrompts.map((prompt) => (
+                  <Button
+                    key={prompt}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto py-1 text-left text-xs whitespace-normal"
+                    onClick={() => onSend(prompt)}
+                  >
+                    {prompt}
+                  </Button>
+                ))}
               </div>
             ) : null}
           </div>
@@ -637,18 +694,29 @@ export function DemoLayout({
             </div>
           ) : null}
 
+          {searchingQuery ? (
+            <div className="flex items-center gap-2 border-t bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+              <Spinner className="size-3 shrink-0" />
+              <span>Browser search in progress. Input is paused until results load.</span>
+            </div>
+          ) : null}
+
           <div className="flex items-center gap-2 border-t p-3">
             <Input
               value={draft}
               onChange={(e) => onDraft(e.target.value)}
               placeholder={
-                connected
-                  ? searches.length
-                    ? "Ask a question or try another search..."
-                    : "Ask the AI agent to search Google..."
-                  : "Connecting..."
+                !connected
+                  ? "Connecting..."
+                  : searchingQuery
+                    ? "Searching live screen, please wait..."
+                    : awaiting
+                      ? "AI agent is responding..."
+                      : searches.length
+                        ? "Ask a question or try another search..."
+                        : "Share your name or a topic to search..."
               }
-              disabled={!connected}
+              disabled={inputLocked}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -656,7 +724,7 @@ export function DemoLayout({
                 }
               }}
             />
-            <Button type="button" onClick={() => onSend()} disabled={!connected || !draft.trim()}>
+            <Button type="button" onClick={() => onSend()} disabled={inputLocked || !draft.trim()}>
               Send
             </Button>
           </div>

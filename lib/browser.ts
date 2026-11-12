@@ -13,6 +13,8 @@ export type LiveSession = {
   message: string;
 };
 
+export type StartStep = "session" | "google" | "live";
+
 type ActiveSession = {
   browser: Browser;
   page: Page;
@@ -94,7 +96,10 @@ export async function releaseSession(sessionId: string) {
   }
 }
 
-export async function startLiveSession(previousId?: string | null): Promise<LiveSession> {
+export async function startLiveSession(
+  previousId?: string | null,
+  onStep?: (step: StartStep) => void,
+): Promise<LiveSession> {
   if (!apiKey()) throw new Error("BROWSERBASE_API_KEY is not set.");
 
   const stale = new Set(liveStore().ids);
@@ -111,6 +116,7 @@ export async function startLiveSession(previousId?: string | null): Promise<Live
   });
   log("session created", { id: session.id, status: session.status, hasConnectUrl: Boolean(session.connectUrl) });
   trackSession(session.id);
+  onStep?.("session");
 
   try {
     log("connecting CDP", { id: session.id });
@@ -119,6 +125,7 @@ export async function startLiveSession(previousId?: string | null): Promise<Live
     await active.page.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 25000 });
     await dismissConsent(active.page);
     await injectCursor(active.page);
+    onStep?.("google");
   } catch (error) {
     logErr(`setup (${session.id})`, error);
     await releaseSession(session.id);
@@ -129,6 +136,7 @@ export async function startLiveSession(previousId?: string | null): Promise<Live
   const pageView = debug.pages?.[0]?.debuggerFullscreenUrl || debug.debuggerFullscreenUrl;
   const liveViewUrl = appendNavbarFalse(pageView);
   log("live view ready", { id: session.id, pages: debug.pages?.length ?? 0 });
+  onStep?.("live");
 
   return {
     sessionId: session.id,

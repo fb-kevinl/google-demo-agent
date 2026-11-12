@@ -43,7 +43,7 @@ function readLocalConfig() {
     response_timeout_secs: 30,
     pre_tool_speech: "force",
     execution_mode: "immediate",
-    interruption_mode: "allow",
+    interruption_mode: "disable_during_tool_and_turn",
   };
 
   return { systemPrompt, kbText, searchTool };
